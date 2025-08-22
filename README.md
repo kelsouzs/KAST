@@ -27,13 +27,12 @@ Developed at the [Laboratory of Molecular Modeling (LMM-UEFS)](https://lmm.uefs.
 
 ## ✨ Features at a Glance
 
-- ⚡ **Automated CLI Workflow:** Interactive menu with progress bars and modular scripts
-- 🧠 **Deep Learning Model:** Neural network (DeepChem/Tensorflow) learns molecular fingerprints (ECFP/Morgan)
-- 🎯 **K-Prediction Score:** Proprietary scoring system for ranking molecular activity predictions
-- 🧪 **Scientific Validation:** Full suite: ROC/AUC, Cross-Validation, Enrichment Factor, Tanimoto Similarity, Learning Curve
-- 📊 **Rich Outputs:** Reports, CSVs, and publication-ready plots
-- 🔄 **Reproducibility:** Environment checker, logging, config management
-- 🖥️ **User-Friendly:** Step-by-step guidance, clean folder structure, error handling
+- ⚡ **Automated CLI Workflow** 
+- 🧠 **Deep Learning Model**
+- 🎯 **K-Prediction Score** 
+- 🧪 **Scientific Validation** 
+- 📊 **Rich Outputs** 
+- 🖥️ **User-Friendly** 
 
 ---
 
@@ -158,4 +157,5 @@ Open an [issue](https://github.com/kelsouzs/KAST/issues) or email [kelsouzs.uefs
 
 
 ---
+
 

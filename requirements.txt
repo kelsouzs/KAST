@@ -1,0 +1,8 @@
+tensorflow
+torch
+deepchem
+pandas
+numpy
+scikit-learn
+matplotlib
+tqdm

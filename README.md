@@ -137,7 +137,7 @@ conda install -c conda-forge rdkit
 **A:** All results are in the `results/` folder.
 
 **Q:** How do I run on my own molecules?  
-**A:** Place your `.smi` file in `dados/` and use `[5]` menu option.
+**A:** Place your `.smi` file in `data/` and use `[5]` menu option.
 
 **Q:** What is the K-Prediction Score?  
 **A:** The K-Prediction Score is the proprietary scoring function used by K-talysticFlow to rank molecular activity predictions, with values ranging from 0 to 1 (higher scores indicate higher predicted activity).
@@ -157,5 +157,6 @@ Open an [issue](https://github.com/kelsouzs/KAST/issues) or email [kelsouzs.uefs
 
 
 ---
+
 
 

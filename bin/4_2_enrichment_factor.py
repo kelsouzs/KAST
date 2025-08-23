@@ -54,7 +54,7 @@ def load_predictions(file_path: str) -> Optional[Tuple[np.ndarray, np.ndarray]]:
     
     try:
         df = pd.read_csv(file_path)
-        required_cols = ['true_label', 'predicted_probability_active']
+        required_cols = ['true_label', 'predicted_probability']
         
         if not all(col in df.columns for col in required_cols):
             print(f"\nERROR: The predictions CSV file must contain the columns: {required_cols}")
@@ -62,7 +62,7 @@ def load_predictions(file_path: str) -> Optional[Tuple[np.ndarray, np.ndarray]]:
             return None
         
         y_true = df['true_label'].values
-        y_score = df['predicted_probability_active'].values
+        y_score = df['predicted_probability'].values
         
         print(f"\n✅ Predictions loaded: {len(y_true)} samples")
         print(f"  -> Active molecules: {np.sum(y_true)}")

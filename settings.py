@@ -64,6 +64,6 @@ LABEL_COL = 'active'
 OUTPUT_PREDICTIONS_CSV = '5_1_new_molecule_predictions.csv'
 
 # --- 11. EXTRA CONFIGURATIONS (FOR COMPATIBILITY) ---
-N_JOBS = -1          # ✅ For parallelization
-VERBOSE = True       # ✅ For verbose logs
-DEBUG = False        # ✅ For debugging
+N_JOBS = -1         
+VERBOSE = True      
+DEBUG = False    

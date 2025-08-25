@@ -11,6 +11,7 @@ REQUIREMENTS:
 
 OUTPUT:
 - CSV file with predictions sorted by descending probability
+- TXT report with prediction statistics and top candidates
 """
 
 import sys
@@ -43,7 +44,6 @@ from utils import ensure_dir_exists
 
 
 def load_data_and_model() -> Optional[Tuple[dc.data.Dataset, dc.models.Model]]:
-    """Loads the featurized dataset and the trained model."""
     from rdkit import RDLogger
     RDLogger.DisableLog('rdApp.*')
     
@@ -70,7 +70,6 @@ def load_data_and_model() -> Optional[Tuple[dc.data.Dataset, dc.models.Model]]:
         
     try:
         n_features = prediction_dataset.get_shape()[0][1]
-        print(f"  -> Number of detected features: {n_features}")
         
         model = dc.models.MultitaskClassifier(
             n_tasks=cfg.MODEL_PARAMS['n_tasks'],
@@ -93,7 +92,6 @@ def load_data_and_model() -> Optional[Tuple[dc.data.Dataset, dc.models.Model]]:
 
 
 def run_prediction(model: dc.models.Model, dataset: dc.data.Dataset) -> pd.DataFrame:
-    """Runs predictions on the featurized dataset."""
     print(f"\nRunning predictions for {len(dataset)} molecules...")
     
     try:
@@ -128,8 +126,6 @@ def run_prediction(model: dc.models.Model, dataset: dc.data.Dataset) -> pd.DataF
             ascending=False
         ).reset_index(drop=True)
         
-        print(f"✅ Predictions completed successfully")
-        
         return results_df
         
     except Exception as e:
@@ -138,15 +134,16 @@ def run_prediction(model: dc.models.Model, dataset: dc.data.Dataset) -> pd.DataF
 
 
 def display_and_save_results(results_df: pd.DataFrame):
-    """Displays a summary of predictions and saves them to CSV."""
+    """Displays a summary of predictions and saves them to CSV and TXT report."""
     if results_df.empty:
         print("\n⚠️ ERROR: No results to save.")
         return
     
     try:
-        output_path = os.path.join(cfg.RESULTS_DIR, cfg.OUTPUT_PREDICTIONS_CSV)
+        output_csv = os.path.join(cfg.RESULTS_DIR, cfg.OUTPUT_PREDICTIONS_CSV)
+        output_report = os.path.join(cfg.RESULTS_DIR, "5_1_prediction_report.txt")
         ensure_dir_exists(cfg.RESULTS_DIR)
-        results_df.to_csv(output_path, index=False)
+        results_df.to_csv(output_csv, index=False)
         
         total_molecules = len(results_df)
         high_prob = len(results_df[results_df['K-prediction Score'] > 0.7])
@@ -158,22 +155,36 @@ def display_and_save_results(results_df: pd.DataFrame):
         print("==              PREDICTION RESULTS                     ==")
         print("=========================================================")
         print(f"  Total molecules analyzed   : {total_molecules}")
-        print(f"  High probability (> 0.7)   : {high_prob} ({high_prob/total_molecules*100:.1f}%)")
-        print(f"  Medium probability (0.3-0.7): {medium_prob} ({medium_prob/total_molecules*100:.1f}%)")
-        print(f"  Low probability (≤ 0.3)    : {low_prob} ({low_prob/total_molecules*100:.1f}%)")
         print("---------------------------------------------------------")
-        
-        print("\n---------------------------------------------------------")
         print("  TOP 5 MOST PROMISING CANDIDATES:")
         print("---------------------------------------------------------")
-        
         for i, (_, row) in enumerate(results_df.head().iterrows(), 1):
             prob = row['K-prediction Score']
             smi = row['smiles']
             display_smi = smi if len(smi) <= 60 else smi[:57] + "..."
             print(f"  {i}. {prob:.4f} | {display_smi}")
-        
         print("=========================================================")
+        
+        with open(output_report, "w", encoding="utf-8") as rep:
+            rep.write("=========================================================\n")
+            rep.write("==              PREDICTION RESULTS                     ==\n")
+            rep.write("=========================================================\n")
+            rep.write(f"  Total molecules analyzed   : {total_molecules}\n")
+            rep.write(f"  High probability (> 0.7)   : {high_prob} ({high_prob/total_molecules*100:.1f}%)\n")
+            rep.write(f"  Medium probability (0.3-0.7): {medium_prob} ({medium_prob/total_molecules*100:.1f}%)\n")
+            rep.write(f"  Low probability (≤ 0.3)    : {low_prob} ({low_prob/total_molecules*100:.1f}%)\n")
+            rep.write("---------------------------------------------------------\n")
+            rep.write("\n---------------------------------------------------------\n")
+            rep.write("  TOP 5 MOST PROMISING CANDIDATES:\n")
+            rep.write("---------------------------------------------------------\n")
+            for i, (_, row) in enumerate(results_df.head().iterrows(), 1):
+                prob = row['K-prediction Score']
+                smi = row['smiles']
+                display_smi = smi if len(smi) <= 60 else smi[:57] + "..."
+                rep.write(f"  {i}. {prob:.4f} | {display_smi}\n")
+            rep.write("=========================================================\n")
+        
+        print(f"\n✅ Prediction report saved to: {output_report}")
         
     except Exception as e:
         print(f"\nERROR saving results: {e}")
@@ -181,7 +192,7 @@ def display_and_save_results(results_df: pd.DataFrame):
 
 def main():
     print("\n--- K-talysticFlow | Step 5.1: Running Predictions ---")
-    print("🔮 This script ONLY runs predictions on already featurized data")
+    print("\n🔮 This script ONLY runs predictions on already featurized data")
     
     loaded_assets = load_data_and_model()
     if loaded_assets[0] is None:

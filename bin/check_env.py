@@ -2,12 +2,10 @@ import sys
 import os
 import importlib.util
 
-# Package mapping (pip) to import names (python)
-# Add others here if needed. Ex: 'beautifulsoup4': 'bs4'
 PACKAGE_IMPORT_MAP = {
     'scikit-learn': 'sklearn',
-    'rdkit-pypi': 'rdkit', # If you installed rdkit via pip
-    'rdkit': 'rdkit'      # Common name
+    'rdkit-pypi': 'rdkit', 
+    'rdkit': 'rdkit'      
 }
 
 # Terminal color codes
@@ -26,9 +24,7 @@ def parse_requirements(file_path):
     with open(file_path, 'r') as f:
         for line in f:
             line = line.strip()
-            # Ignore comments, empty lines and edit flags (-e)
             if line and not line.startswith('#') and not line.startswith('-e'):
-                # Remove version specifiers (==, >=, <=, [) to get package name
                 package_name = line.split('==')[0].split('>=')[0].split('<=')[0].split('[')[0]
                 packages.append(package_name.strip())
     return packages
@@ -37,7 +33,6 @@ def check_dependencies():
     """Checks if requirements.txt dependencies are installed."""
     print("--- Checking environment dependencies ---")
     
-    # Script is in /bin, requirements.txt is in parent directory (root)
     req_path = os.path.join(os.path.dirname(__file__), '..', 'requirements.txt')
     packages = parse_requirements(req_path)
 
@@ -67,7 +62,7 @@ def check_dependencies():
             print(f"  - {pkg}")
         
         print(f"\n{YELLOW}--- Recommended Actions ---{RESET}")
-        print("1. Make sure your conda environment ('modelo_preditivo') is activated.")
+        print("1. Make sure your conda environment is activated.")
         if 'rdkit' in [p.lower() for p in missing_packages]:
             print(f"2. For {YELLOW}RDKit{RESET}, use the specific command:")
             print(f"   {YELLOW}conda install -c conda-forge rdkit{RESET}")
@@ -77,4 +72,4 @@ def check_dependencies():
 
 if __name__ == "__main__":
     all_ok = check_dependencies()
-    sys.exit(0 if all_ok else 1) # Returns 0 for success, 1 for error
+    sys.exit(0 if all_ok else 1)

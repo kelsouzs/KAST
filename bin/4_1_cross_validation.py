@@ -1,5 +1,3 @@
-# bin/4_1_cross_validation.py
-
 """
 K-talysticFlow - Step 4.1: Cross-Validation
 
@@ -12,7 +10,6 @@ Technique Used:
   model to learn to generalize to new chemical structures.
 """
 
-# --- Configuration and Warning Suppression Block ---
 import os
 import warnings
 import logging
@@ -26,15 +23,12 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 import tensorflow as tf
 tf.get_logger().setLevel('ERROR')
 logging.getLogger('deepchem').setLevel('ERROR')
-# --- End Block ---
 
-# --- Main Imports ---
 import sys
 import numpy as np
 import deepchem as dc
 from sklearn.metrics import roc_auc_score
 
-# --- Add project root to system path ---
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -42,14 +36,32 @@ if project_root not in sys.path:
 import settings as cfg
 from utils import ensure_dir_exists, load_smiles_from_file
 
-# --- Helper Functions ---
+def ensure_cv_reproducibility(seed=42): 
+    import random
+    import numpy as np
+    import tensorflow as tf
+    
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    
+    os.environ['TF_DETERMINISTIC_OPS'] = '1'
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    
+    try:
+        tf.config.experimental.enable_op_determinism()
+    except:
+        pass
+    
+    try:
+        import deepchem as dc
+        dc.utils.set_random_seed(seed)
+    except:
+        pass
+    
+    print("✅ Cross-validation reproducibility configured")
 
 def load_and_featurize_all_data():
-    """
-    Loads all data, featurizes, and creates a dataset containing
-    fingerprints (X), labels (y), and SMILES (ids).
-    """
-    # ✅ Fix: Suppress RDKit warnings
     from rdkit import RDLogger
     RDLogger.DisableLog('rdApp.*')
     
@@ -193,9 +205,9 @@ def save_cv_results(scores):
 
 
 def main():
-    """Orchestrates the cross-validation workflow."""
+    ensure_cv_reproducibility(seed=42)
+    
     print("\n--- K-talysticFlow | Step 4.1: Cross-Validation ---")
-
 
     full_dataset = load_and_featurize_all_data()
     if full_dataset is None:
@@ -210,7 +222,7 @@ def main():
     if mean_auc is not None:
         display_summary(mean_auc, std_auc)
         print("\n✅ Cross-Validation completed successfully!")
-        print("\n➡️     Next step: run the remaining detailed evaluation scripts.")
+        print("\n➡️ Next step: run the remaining detailed evaluation scripts.")
     else:
         print("\n❌ Cross-Validation failed!")
         sys.exit(1)

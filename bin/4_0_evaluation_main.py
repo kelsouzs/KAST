@@ -195,24 +195,6 @@ def create_roc_plot(fpr, tpr, roc_auc, save_path):
                       facecolor='white')
     legend.get_frame().set_linewidth(1.5)
     
-    if roc_auc >= 0.9:
-        performance_text = "Excellent Performance"
-        perf_color = '#27ae60'
-    elif roc_auc >= 0.8:
-        performance_text = "Good Performance"
-        perf_color = '#f39c12'
-    elif roc_auc >= 0.7:
-        performance_text = "Fair Performance"
-        perf_color = '#e67e22'
-    else:
-        performance_text = "Poor Performance"
-        perf_color = '#e74c3c'
-    
-    ax.text(0.6, 0.2, f'{performance_text}', 
-           fontsize=11, fontweight='bold', 
-           color=perf_color, alpha=0.8,
-           bbox=dict(boxstyle="round,pad=0.3", facecolor='white', edgecolor=perf_color, alpha=0.8))
-    
     for spine in ax.spines.values():
         spine.set_linewidth(2)
         spine.set_color('#34495e')

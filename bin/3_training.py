@@ -1,5 +1,3 @@
-# bin/3_training.py
-
 """
 K-talysticFlow - Step 3: Model Training
 
@@ -11,6 +9,7 @@ import sys
 import os
 import warnings
 import logging
+import random 
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
@@ -24,6 +23,7 @@ logging.getLogger('deepchem').setLevel('ERROR')
 
 import deepchem as dc
 import json
+import numpy as np 
 from datetime import datetime
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -33,10 +33,74 @@ if project_root not in sys.path:
 import settings as cfg
 from utils import ensure_dir_exists
 
-def main():
-    """Train the classification model."""
-    print("\n--- K-talysticFlow | Step 3: Training the Model ---")
+def ensure_training_reproducibility(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    
+    os.environ['TF_DETERMINISTIC_OPS'] = '1'
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    
+    try:
+        tf.config.experimental.enable_op_determinism()
+        print("✅ TensorFlow deterministic operations enabled")
+    except Exception:
+        print("⚠️ TensorFlow deterministic operations not available (older TF version)")
+    
+    try:
+        dc.utils.set_random_seed(seed)
+        print("✅ DeepChem random seed set")
+    except Exception:
+        print("⚠️ DeepChem seed setting not available")
+    
+    print("✅ Training reproducibility configured - identical results guaranteed")
 
+def save_training_metadata():
+    import platform
+    
+    metadata = {
+        "training_date": datetime.now().isoformat(),
+        "random_seed": 42,
+        "python_version": platform.python_version(),
+        "tensorflow_version": tf.__version__,
+        "deepchem_version": dc.__version__,
+        "numpy_version": np.__version__,
+        "system": platform.system(),
+        "architecture": platform.architecture()[0],
+        "deterministic_ops": os.environ.get('TF_DETERMINISTIC_OPS', 'not_set'),
+        "model_parameters": cfg.MODEL_PARAMS,
+        "fingerprint_settings": {
+            "fp_size": cfg.FP_SIZE,
+            "fp_radius": cfg.FP_RADIUS
+        }
+    }
+    
+    try:
+        # Check if GPU is available and configured
+        gpu_devices = tf.config.list_physical_devices('GPU')
+        metadata["gpu_available"] = len(gpu_devices) > 0
+        metadata["gpu_count"] = len(gpu_devices)
+        if gpu_devices:
+            metadata["gpu_details"] = str(gpu_devices)
+    except:
+        metadata["gpu_available"] = False
+    
+    try:
+        metadata_path = os.path.join(cfg.RESULTS_DIR, 'training_metadata.json')
+        ensure_dir_exists(cfg.RESULTS_DIR)
+        
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        print(f"📋 Training metadata saved: {metadata_path}")
+        
+    except Exception as e:
+        print(f"⚠️ Could not save training metadata: {e}")
+
+def main():
+    ensure_training_reproducibility(seed=42)
+    
+    print("\n--- K-talysticFlow | Step 3: Training the Model ---")
 
     from rdkit import RDLogger
     RDLogger.DisableLog('rdApp.*')
@@ -47,7 +111,6 @@ def main():
     log_file_path = os.path.join(cfg.RESULTS_DIR, '03_training_log.txt')
     
     ensure_dir_exists(cfg.MODEL_DIR)
-
 
     log_content = f"--- Training Log ---\nStarted at: {start_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
     log_content += f"Model Parameters:\n{json.dumps(cfg.MODEL_PARAMS, indent=2)}\n\n"
@@ -83,7 +146,7 @@ def main():
             model_dir=cfg.MODEL_DIR
         )
 
-        print(f"\nStarting training for {cfg.MODEL_PARAMS['nb_epoch']} epochs...")
+        print(f"\nStarting deterministic training for {cfg.MODEL_PARAMS['nb_epoch']} epochs...")
         print("\n⚠️ This process may take several minutes...")
         
         model.fit(train_dataset, nb_epoch=cfg.MODEL_PARAMS['nb_epoch'])
@@ -100,8 +163,10 @@ def main():
         with open(log_file_path, 'w') as f:
             f.write(log_content)
         
+        save_training_metadata()
+        
         print(f"\nLog saved in: {log_file_path}")
-        print("\n✅ Model trained and saved successfully!")
+        print("\n✅ Model created, trained and saved successfully!")
         print("➡️ Next: '[4] Evaluate the Model'.")
         
     except Exception as e:

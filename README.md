@@ -153,10 +153,11 @@ Pull requests welcome! For major changes, open an issue first to discuss.
 ## 📬 Contact
 
 Questions or suggestions?  
-Open an [issue](https://github.com/kelsouzs/KAST/issues) or email [kelsouzs.uefs@gmail.com](mailto:kelsouzs.uefs@gmail.com)
+Open an [issue](https://github.com/kelsouzs/KAST/issues) or email [lmm@uefs.br](mailto:lmm@uefs.br)
 
 
 ---
+
 
 
 

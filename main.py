@@ -84,7 +84,7 @@ except (ModuleNotFoundError, ImportError):
 
 def display_splash_screen():
     art = r"""
-         __  __    _     ____  _____ 
+            __  __    _     ____  _____ 
             | |/ /   / \   / ___||_   _|
             | ' /   / _ \  \___ \  | |  
             | . \  / ___ \  ___) | | |  
@@ -165,7 +165,7 @@ def step_1_preparation():
     if not check_data_files():
         input("\nFix missing files and try again. Press Enter...")
         return False
-    logging.info(" Starting data preparation...")
+    logging.info(" Starting 'Data Preparation'")
     result = run_script("1_preparation.py")
     if result:
         logging.info(" Step completed successfully")
@@ -174,7 +174,7 @@ def step_1_preparation():
     return result
 
 def step_2_featurization(): 
-    logging.info(" Starting featurization")
+    logging.info(" Starting 'Featurization'")
     result = run_script("2_featurization.py")
     if result:
         logging.info(" Step completed successfully")
@@ -183,12 +183,12 @@ def step_2_featurization():
     return result
 
 def step_3_training(): 
-    logging.info(" Starting training")
+    logging.info(" Starting 'Create and Train the Model'")
     result = run_script("3_training.py")
     if result:
         logging.info(" Step completed successfully")
     else:
-        logging.error(" Training failed")
+        logging.error("Step failed")
     return result
 
 def step_4_evaluation_menu():
@@ -327,7 +327,7 @@ def display_menu():
     print("=========================================================")
     print("\n  [1] Prepare and Split Data")
     print("  [2] Generate Fingerprints")
-    print("  [3] Train the Model")
+    print("  [3] Create and Train the Model")
     print("  [4] Evaluate the Model")
     print("  [5] Predict Activity of New Molecules")
     print("\n------------------- FULL FLOW ----------------------")

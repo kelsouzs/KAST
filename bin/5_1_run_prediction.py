@@ -22,15 +22,21 @@ import warnings
 from typing import Tuple, Optional
 import random
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+# Suppress all warnings and TensorFlow/DeepChem messages BEFORE imports
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-warnings.filterwarnings('ignore', category=UserWarning)
-warnings.filterwarnings('ignore', category=FutureWarning)
-warnings.filterwarnings('ignore', category=DeprecationWarning)
+os.environ['TF_CPP_MIN_VLOG_LEVEL'] = '3'
+warnings.filterwarnings('ignore')
+import logging
+logging.getLogger().setLevel(logging.ERROR)
 
 import tensorflow as tf
 tf.get_logger().setLevel('ERROR')
+logging.getLogger('tensorflow').setLevel('ERROR')
 logging.getLogger('deepchem').setLevel('ERROR')
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 import pandas as pd
 import deepchem as dc
@@ -82,13 +88,27 @@ def predict_batch_worker(batch_data: Tuple[int, csr_matrix], model_dir: str, mod
         Tuple of (batch_index, predictions)
     """
     try:
+        # CRITICAL: Suppress ALL warnings/logs in worker processes
         import warnings
-        warnings.filterwarnings('ignore')
+        import logging
         import os
+        import sys
+        
+        warnings.filterwarnings('ignore')
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+        os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+        logging.getLogger().setLevel(logging.ERROR)
+        
+        # Redirect stderr to null to suppress DeepChem import warnings
+        stderr_backup = sys.stderr
+        sys.stderr = open(os.devnull, 'w')
         
         import deepchem as dc
         import numpy as np
+        
+        # Restore stderr after import
+        sys.stderr.close()
+        sys.stderr = stderr_backup
         
         batch_idx, batch_sparse = batch_data
         
@@ -160,7 +180,7 @@ def load_sparse_hdf5_data() -> Optional[Tuple[csr_matrix, list]]:
     from rdkit import RDLogger
     RDLogger.DisableLog('rdApp.*')
 
-    print("\n📦 Loading featurized dataset...")
+    print("📦 Loading featurized dataset...")
 
     if not os.path.exists(cfg.PREDICTION_FEATURIZED_DIR):
         print(f"\nERROR: Directory '{cfg.PREDICTION_FEATURIZED_DIR}' not found.")
@@ -270,11 +290,13 @@ def run_prediction(model: dc.models.Model, features_sparse: csr_matrix, smiles_l
                 batch_sparse = features_sparse[i:end_idx]
                 batches.append((i // batch_size, batch_sparse))
             
-            # Process batches in parallel
-            print(f"\n🚀 Processing in parallel...")
-            results = Parallel(n_jobs=n_workers, verbose=5, backend='loky')(
+            # Process batches in parallel with tqdm progress bar
+            print(f"\n🚀 Processing {total_batches} batches with {n_workers} workers...")
+            
+            from tqdm import tqdm
+            results = Parallel(n_jobs=n_workers, verbose=0, backend='loky')(
                 delayed(predict_batch_worker)(batch, cfg.MODEL_DIR, cfg.MODEL_PARAMS)
-                for batch in batches
+                for batch in tqdm(batches, desc="Predicting", unit="batch")
             )
             
             # Sort results by batch index and concatenate
@@ -487,19 +509,32 @@ def save_smi_file(results_df: pd.DataFrame, output_path: str, export_type: str, 
 
 
 def display_and_save_results(results_df: pd.DataFrame, custom_filename: str, smi_export_type: str, smi_value: float = None):
-    """Save results with custom filename and SMI preferences."""
+    """
+    Save results with custom filename and SMI preferences.
+    Uses temporary files and atomic operations to prevent partial/corrupted outputs.
+    """
     if results_df.empty:
         print("\n⚠️ ERROR: No results to save.")
         return
     
+    # Define final output paths
+    output_csv = os.path.join(cfg.RESULTS_DIR, f"{custom_filename}.csv")
+    output_report = os.path.join(cfg.RESULTS_DIR, f"{custom_filename}_report.txt")
+    output_smi = os.path.join(cfg.RESULTS_DIR, f"{custom_filename}.smi")
+    
+    # Define temporary file paths
+    temp_csv = output_csv + ".tmp"
+    temp_report = output_report + ".tmp"
+    temp_smi = output_smi + ".tmp"
+    
+    temp_files = [temp_csv, temp_report, temp_smi]
+    
     try:
-        output_csv = os.path.join(cfg.RESULTS_DIR, f"{custom_filename}.csv")
-        output_report = os.path.join(cfg.RESULTS_DIR, f"{custom_filename}_report.txt")
-        output_smi = os.path.join(cfg.RESULTS_DIR, f"{custom_filename}.smi")
-        
         ensure_dir_exists(cfg.RESULTS_DIR)
-
-        results_df.to_csv(output_csv, index=False)
+        
+        # Step 1: Save CSV to temporary file
+        print("\n💾 Saving results...")
+        results_df.to_csv(temp_csv, index=False)
 
         total_molecules = len(results_df)
         very_high = len(results_df[results_df['K-prediction Score'] > 0.9])
@@ -511,7 +546,8 @@ def display_and_save_results(results_df: pd.DataFrame, custom_filename: str, smi
                                    (results_df['K-prediction Score'] <= 0.5)])
         low_prob = len(results_df[results_df['K-prediction Score'] <= 0.3])
 
-        with open(output_report, "w", encoding="utf-8") as rep:
+        # Step 2: Generate report to temporary file
+        with open(temp_report, "w", encoding="utf-8") as rep:
             rep.write("="*70 + "\n")
             rep.write("                    PREDICTION RESULTS REPORT\n")
             rep.write("="*70 + "\n")
@@ -535,7 +571,44 @@ def display_and_save_results(results_df: pd.DataFrame, custom_filename: str, smi
                 rep.write(f"{i:2d}. {name} | {prob:.4f} | {smi}\n")
             rep.write("="*70 + "\n")
 
-        save_smi_file(results_df, output_smi, smi_export_type, smi_value)
+        # Step 3: Generate SMI file to temporary location
+        save_smi_file(results_df, temp_smi, smi_export_type, smi_value)
+        
+        # Step 4: All files generated successfully - now move them atomically
+        print("   🔄 Finalizing files...")
+        import shutil
+        import time
+        
+        def safe_move_with_retry(src, dst, max_retries=3):
+            """
+            Safely move file with retry logic for Windows 'file in use' errors.
+            If move fails, tries copy+delete as fallback.
+            """
+            for attempt in range(max_retries):
+                try:
+                    # Try atomic move first
+                    if os.path.exists(dst):
+                        os.remove(dst)  # Remove old file if exists
+                    shutil.move(src, dst)
+                    return True
+                except (PermissionError, OSError) as e:
+                    if attempt < max_retries - 1:
+                        # Wait a bit and retry (Windows file lock issue)
+                        time.sleep(0.5)
+                        continue
+                    else:
+                        # Last resort: copy + delete
+                        try:
+                            shutil.copy2(src, dst)
+                            os.remove(src)
+                            return True
+                        except Exception as fallback_error:
+                            raise Exception(f"Failed to move {src} to {dst}: {fallback_error}")
+            return False
+        
+        safe_move_with_retry(temp_csv, output_csv)
+        safe_move_with_retry(temp_report, output_report)
+        safe_move_with_retry(temp_smi, output_smi)
         
         print(f"\n✅ All files saved successfully:")
         print(f"   📊 CSV file: {output_csv}")
@@ -543,7 +616,20 @@ def display_and_save_results(results_df: pd.DataFrame, custom_filename: str, smi
         print(f"   🧬 SMI file: {output_smi}")
         
     except Exception as e:
-        print(f"\nERROR saving results: {e}")
+        print(f"\n❌ ERROR saving results: {e}")
+        print("   🧹 Cleaning up temporary files...")
+        
+        # Cleanup: Remove any temporary files that may have been created
+        for temp_file in temp_files:
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+                    print(f"   ✓ Removed: {os.path.basename(temp_file)}")
+            except Exception as cleanup_error:
+                print(f"   ⚠️ Could not remove {os.path.basename(temp_file)}: {cleanup_error}")
+        
+        print("\n⚠️ No output files were created due to the error.")
+        print("   Please check the error message above and try again.")
 
 
 def main():

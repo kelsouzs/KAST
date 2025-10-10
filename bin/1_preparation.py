@@ -39,31 +39,30 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import settings as cfg
-from utils import ensure_dir_exists, load_smiles_from_file
+from utils import ensure_dir_exists, load_smiles_from_file, validate_smiles
 
 def warn_and_confirm_data_files(data_dir):
     """
     Displays a warning about the need for .smi files in the /data folder
     and asks for user confirmation before proceeding.
     """
-    print("\n============================================================")
     print("⚠️  WARNING: To create the model, you need the following files:")
     print("    - Actives (.smi) and Inactives/Decoys (.smi)")
     print("    - They must be in the '/data' folder in SMILES (.smi) format")
     print("------------------------------------------------------------")
     print("Example of expected files:")
-    print(f"    {data_dir}/actives.smi")
-    print(f"    {data_dir}/inactives.smi   or")
-    print(f"    {data_dir}/decoys.smi")
+    print(f"{data_dir}/actives.smi")
+    print(f"{data_dir}/inactives.smi   or")
+    print(f"{data_dir}/decoys.smi")
     print("------------------------------------------------------------")
-    print("Check if the files are present and correctly named!")
-    input("Press Enter to continue...")
 
-def select_smiles_file(prompt):
+def select_smiles_file(prompt, logger):
     data_dir = os.path.join(project_root, 'data')  
     files = [f for f in os.listdir(data_dir) if f.endswith('.smi')]
     if not files:
-        print(f"\nERROR: No .smi file found in '{data_dir}'.")
+        error_msg = f"No .smi file found in '{data_dir}'"
+        print(f"\nERROR: {error_msg}")
+        logger.error(error_msg)
         sys.exit(1)
     print(f"\n{prompt}")
     for i, f in enumerate(files, 1):
@@ -84,18 +83,33 @@ def load_and_label_data(active_path, inactive_path):
     """Loads, labels, and combines data from active and inactive molecules."""
     print(f"\n-------------------------------------------------------------")
     print(f"Loading actives from: {active_path}")
-    active_smiles = load_smiles_from_file(active_path)
+    active_smiles_raw = load_smiles_from_file(active_path)
     
     print(f"\nLoading inactives from: {inactive_path}")
-    inactive_smiles = load_smiles_from_file(inactive_path)
+    inactive_smiles_raw = load_smiles_from_file(inactive_path)
     print(f"-------------------------------------------------------------")
 
-    if not active_smiles or not inactive_smiles:
+    if not active_smiles_raw or not inactive_smiles_raw:
         print("\nERROR: Failed to load SMILES files. Check the selected files.")
         return None
 
-    print(f"\nTotal actives loaded: {len(active_smiles)}")
-    print(f"Total inactives loaded: {len(inactive_smiles)}")
+    print(f"\nTotal actives loaded: {len(active_smiles_raw)}")
+    print(f"Total inactives loaded: {len(inactive_smiles_raw)}")
+    
+    # Validate and canonicalize SMILES
+    print("\nValidating SMILES...")
+    print("  -> Validating actives...")
+    active_smiles = validate_smiles(active_smiles_raw)
+    print("  -> Validating inactives...")
+    inactive_smiles = validate_smiles(inactive_smiles_raw)
+    
+    if not active_smiles or not inactive_smiles:
+        print("\nERROR: No valid SMILES found after validation.")
+        return None
+    
+    print(f"\nValid molecules after validation:")
+    print(f"  -> Actives: {len(active_smiles)} (removed: {len(active_smiles_raw) - len(active_smiles)})")
+    print(f"  -> Inactives: {len(inactive_smiles)} (removed: {len(inactive_smiles_raw) - len(inactive_smiles)})")
 
     actives_df = pd.DataFrame({cfg.SMILES_COL: active_smiles, cfg.LABEL_COL: 1})
     inactives_df = pd.DataFrame({cfg.SMILES_COL: inactive_smiles, cfg.LABEL_COL: 0})
@@ -184,20 +198,25 @@ def save_datasets(train_df, test_df):
 
 
 def main():
-    print("--- K-talysticFlow | Step 1: Preparing and Splitting Data ---")
+    from utils import print_script_banner, setup_script_logging, log_error
+    logger = setup_script_logging("1_preparation")
+    
+    print_script_banner("K-talysticFlow | Step 1: Preparing and Splitting Data")
+    logger.info("Starting data preparation and splitting")
 
     data_dir = os.path.join(project_root, 'data')
     warn_and_confirm_data_files(data_dir)
 
-    active_file = select_smiles_file("Select the file with ACTIVE molecules (.smi):")
-    inactive_file = select_smiles_file("Select the file with INACTIVE molecules (.smi):")
+    active_file = select_smiles_file("Select the file with ACTIVE molecules (.smi):", logger)
+    inactive_file = select_smiles_file("Select the file with INACTIVE molecules (.smi):", logger)
 
     all_data = load_and_label_data(active_file, inactive_file)
     if all_data is None:
+        log_error(logger, "Failed to load and label data")
         sys.exit(1)  
 
 
-    print("\nValidating data...")
+    print("\nChecking dataset size requirements...")
     active_count = len(all_data[all_data[cfg.LABEL_COL] == 1])
     inactive_count = len(all_data[all_data[cfg.LABEL_COL] == 0])
     
@@ -208,13 +227,20 @@ def main():
     if inactive_count < cfg.MIN_MOLECULES_PER_CLASS:
         print(f"\n⚠️ WARNING: Few inactive molecules ({inactive_count}).")
         print(f"   Minimum recommended: {cfg.MIN_MOLECULES_PER_CLASS}")
+    
+    total_valid = active_count + inactive_count
+    print(f"\n✅ Dataset ready: {total_valid} valid molecules ({active_count} actives, {inactive_count} inactives)")
 
     train_dataset, test_dataset = split_data_scaffold(all_data)
 
     save_datasets(train_dataset, test_dataset)
 
     print("\n✅ Data preparation and splitting completed successfully!")
-    print("\n➡️    Next step: '[2] Generate Fingerprints'.")
+    print("\n➡️ Next step: '[2] Generate Fingerprints'.")
+    
+    from utils import setup_script_logging
+    logger = setup_script_logging("1_preparation")
+    logger.info("Data preparation completed successfully")
 
 
 if __name__ == '__main__':

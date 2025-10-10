@@ -102,7 +102,7 @@ def generate_learning_curve_points(features: np.ndarray, labels: np.ndarray) -> 
         train_sizes_fractions = np.linspace(0.1, 1.0, 10, endpoint=True)
         train_scores, val_scores, actual_train_sizes = [], [], []
 
-        print(f"\nGenerating {len(train_sizes_fractions)} learning curve points...")
+        print(f"Generating {len(train_sizes_fractions)} learning curve points...")
         
         for i, frac in enumerate(tqdm(train_sizes_fractions, desc="Curve Progress")):
             try:
@@ -256,36 +256,28 @@ def display_summary(train_scores: List[float], val_scores: List[float]):
     final_train_score = train_scores[-1]
     final_val_score = val_scores[-1]
     gap = final_train_score - final_val_score
-    
-    print("\n=========================================================")
-    print("==        LEARNING CURVE SUMMARY                        ==")
-    print("=========================================================")
+
+    print("\n" + "-"*57)
+    print("LEARNING CURVE SUMMARY".center(57))
+    print("-"*57)
     print(f"  Final Training AUC        : {final_train_score:.4f}")
     print(f"  Final Validation AUC      : {final_val_score:.4f}")
     print(f"  Gap (Training - Validation): {gap:.4f}")
-    print("---------------------------------------------------------")
-    
-    # Interpretation
-    if gap > 0.1:
-        interpretation = "Possible overfitting"
-    elif final_val_score < 0.7:
-        interpretation = "Possible underfitting"
-    elif gap < 0.05 and final_val_score > 0.8:
-        interpretation = "Well-fitted model"
-    else:
-        interpretation = "Moderate behavior"
-        
-    print(f"  Interpretation             : {interpretation}")
-    print("=========================================================")
+    print("-"*57)
 
 # --- Main Function ---
 def main():
     """Orchestrates the learning curve generation."""
-    print("\n--- K-talysticFlow | Step 4.4: Learning Curve Generation ---")
+    from utils import print_script_banner, setup_script_logging
+    logger = setup_script_logging("4_4_learning_curve")
+    
+    print_script_banner("K-talysticFlow | Step 4.4: Learning Curve Generation")
+    logger.info("Starting learning curve generation")
 
     # Step 1: Load and featurize all data
     loaded_data = load_and_featurize_data()
     if loaded_data is None:
+        logger.error("Failed to load and featurize data")
         sys.exit(1)
         
     features, labels = loaded_data
@@ -295,6 +287,7 @@ def main():
 
     if not train_sizes:
         print("\n❌ No learning curve points could be generated.")
+        logger.error("Failed to generate learning curve points")
         sys.exit(1)
 
     # Step 3: Save detailed report
@@ -304,9 +297,9 @@ def main():
         
         with open(report_path, 'w') as f:
             f.write(report_content)
-            
-        print(f"✅ Detailed report saved: {report_path}")
-        
+
+        print(f"\n✅ Detailed report saved: {report_path}")
+
     except Exception as e:
         print(f"\n⚠️ ERROR saving report: {e}")
 
@@ -315,6 +308,7 @@ def main():
     plot_and_save_curve(train_sizes, train_scores, val_scores)
 
     print("\n✅ Learning Curve Generation completed successfully!")
+    logger.info("Learning curve generation completed successfully")
 
 if __name__ == '__main__':
     main()

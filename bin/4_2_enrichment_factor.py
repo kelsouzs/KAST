@@ -45,7 +45,7 @@ def load_predictions(file_path: str) -> Optional[Tuple[np.ndarray, np.ndarray]]:
     from rdkit import RDLogger
     RDLogger.DisableLog('rdApp.*')
     
-    print(f"Loading predictions from: {file_path}")
+    print(f"\nLoading predictions from: {file_path}")
     
     if not os.path.exists(file_path):
         print(f"\nERROR: Predictions file '{os.path.basename(file_path)}' not found.")
@@ -79,9 +79,9 @@ def calculate_ef(y_true: np.ndarray, y_score: np.ndarray, fraction_percent: floa
     try:
         fraction = fraction_percent / 100.0
         n_total = len(y_true)
-        n_actives_total = np.sum(y_true)
+        ns_total = np.sum(y_true)
         
-        if n_actives_total == 0:
+        if ns_total == 0:
             print(f"⚠️ WARNING: No actives in the set. EF for {fraction_percent}% is 0.")
             return 0.0
         
@@ -91,10 +91,10 @@ def calculate_ef(y_true: np.ndarray, y_score: np.ndarray, fraction_percent: floa
             
         # Sort by descending score and take the top fraction
         indices = np.argsort(y_score)[::-1]
-        n_actives_top = np.sum(y_true[indices][:n_top])
+        ns_top = np.sum(y_true[indices][:n_top])
         
         # Calculate EF
-        ef = (n_actives_top / n_top) / (n_actives_total / n_total)
+        ef = (ns_top / n_top) / (ns_total / n_total)
         
         return ef
         
@@ -132,31 +132,34 @@ def generate_ef_report(y_true: np.ndarray, y_score: np.ndarray) -> Tuple[str, Di
 
 def display_summary(ef_results: dict):
     """Displays a formatted summary of Enrichment Factor results."""
-    print("\n=========================================================")
-    print("==       ENRICHMENT FACTOR (EF) SUMMARY                ==")
-    print("=========================================================")
-    
+    print("\n" + "-"*57)
+    print("ENRICHMENT FACTOR (EF) SUMMARY".center(57))
+    print("-"*57)
+
     for name, value in ef_results.items():
-        interpretation = "Excellent" if value > 5.0 else "Good" if value > 2.0 else "Moderate" if value > 1.0 else "Low"
-        print(f"  {name:<20}: {value:.4f} ({interpretation})")
-        
-    print("---------------------------------------------------------")
+        print(f"  {name:<20}: {value:.4f}")
+
+    print("-"*57)
     
     valid_efs = [v for v in ef_results.values() if v > 0]
     if valid_efs:
         mean_ef = np.mean(valid_efs)
-        overall = "Excellent" if mean_ef > 5.0 else "Good" if mean_ef > 2.0 else "Moderate" if mean_ef > 1.0 else "Low"
-        print(f"  Mean EF            : {mean_ef:.4f} ({overall})")
-        
-    print("=========================================================")
+        print(f"  Mean EF            : {mean_ef:.4f}")
+
+    print("-"*57)
 
 def main():
-    print("\n--- K-talysticFlow | Step 4.2: Enrichment Factor (EF) Calculation ---")
+    from utils import print_script_banner, setup_script_logging
+    logger = setup_script_logging("4_2_enrichment_factor")
+    
+    print_script_banner("K-talysticFlow | Step 4.2: Enrichment Factor (EF) Calculation")
+    logger.info("Starting enrichment factor calculation")
 
     predictions_path = os.path.join(cfg.RESULTS_DIR, '4_0_test_predictions.csv')
     loaded_data = load_predictions(predictions_path)
     
     if loaded_data is None:
+        logger.error("Failed to load predictions")
         sys.exit(1)
         
     y_true, y_score = loaded_data
@@ -181,7 +184,8 @@ def main():
     display_summary(ef_results)
 
     print("\n✅ Enrichment Factor calculation completed successfully!")
-    print("\n➡️     Next step: run the remaining detailed evaluation scripts.")
+    print("\n➡️ Next step: run the remaining detailed evaluation scripts.")
+    logger.info("Enrichment factor calculation completed successfully")
 
 if __name__ == '__main__':
     main()

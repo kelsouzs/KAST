@@ -147,7 +147,7 @@ def create_roc_plot(fpr, tpr, roc_auc, save_path):
     fig, ax = plt.subplots(figsize=(8, 8), dpi=300)
     fig.patch.set_facecolor('white')
     
-    roc_color = '#1f77b4'      
+    roc_color = "#0D49FA"      
     baseline_color = '#d62728'  
     grid_color = '#f0f0f0'     
 
@@ -168,7 +168,7 @@ def create_roc_plot(fpr, tpr, roc_auc, save_path):
            zorder=2)
     
 
-    ax.fill_between(fpr, tpr, alpha=0.2, color=roc_color, zorder=1)
+    ax.fill_between(fpr, tpr, alpha=0.15, color=roc_color, zorder=1)
     
 
     ax.set_xlim([0.0, 1.0])
@@ -196,8 +196,8 @@ def create_roc_plot(fpr, tpr, roc_auc, save_path):
     legend.get_frame().set_linewidth(1.5)
     
     for spine in ax.spines.values():
-        spine.set_linewidth(2)
-        spine.set_color('#34495e')
+        spine.set_linewidth(2.2)
+        spine.set_color("#000000")
     
     plt.tight_layout()
     plt.savefig(save_path, 
@@ -212,18 +212,16 @@ def create_roc_plot(fpr, tpr, roc_auc, save_path):
 
 def display_summary(metrics):
 
-    print("\n" + "="*65)
-    print("------------------EVALUATION SUMMARY--------------------------")
-    print("="*65)
+    print("\n" + "-"*57)
+    print("EVALUATION SUMMARY".center(57))
+    print("-"*57)
     print(f"  AUC-ROC Score            : {metrics.get('roc_auc', 0):.4f}")
-    print("-"*65)
     print(f"  Accuracy                 : {metrics.get('accuracy', 0):.4f}")
     print(f"  Precision                : {metrics.get('precision', 0):.4f}")
     print(f"  Recall                   : {metrics.get('recall_sensitivity', 0):.4f}")
     print(f"  Specificity              : {metrics.get('specificity', 0):.4f}")
     print(f"  F1-Score                 : {metrics.get('f1_score', 0):.4f}")
-    print("="*65)
-    print("----------------------------------------------------------------")
+    print("-"*57)
    
     auc_score = metrics.get('roc_auc', 0)
     if auc_score >= 0.9:
@@ -234,7 +232,6 @@ def display_summary(metrics):
         print("👍 GOOD! Acceptable performance! 👍")
     else:
         print("⚠️  IMPROVE: Performance below expectations. ⚠️")
-    print()
 
 def save_artifacts(metrics, fpr, tpr, roc_auc, y_true, y_pred_proba, y_pred_class, results_dir):
     """Saves the evaluation results to text, CSV, and PNG files."""
@@ -266,7 +263,11 @@ def save_artifacts(metrics, fpr, tpr, roc_auc, y_true, y_pred_proba, y_pred_clas
 
 def main():
     """Main function to run model evaluation."""
-    print("\n--- K-talysticFlow | Step 4: Main Model Evaluation ---")
+    from utils import print_script_banner, setup_script_logging
+    logger = setup_script_logging("4_0_evaluation")
+    
+    print_script_banner("K-talysticFlow | Step 4: Main Model Evaluation")
+    logger.info("Starting model evaluation")
 
     start_time = datetime.now()
 
@@ -280,10 +281,12 @@ def main():
 
     test_dataset, model = load_test_data_and_model(test_data_dir, model_dir)
     if test_dataset is None or model is None:
+        logger.error("Failed to load test data or model")
         sys.exit(1)
 
     y_true, y_pred_proba, y_pred_class = generate_predictions(model, test_dataset)
     if y_true is None:
+        logger.error("Failed to generate predictions")
         sys.exit(1)
 
     metrics, fpr, tpr = calculate_metrics(y_true, y_pred_proba, y_pred_class)
@@ -296,8 +299,12 @@ def main():
 
     duration = datetime.now() - start_time
     print(f"\n⏱ Total duration: {str(duration).split('.')[0]} seconds")
-    print("\n➡️    Next step: [5] Model Fine-Tuning.")
+    print("\n➡️ Next step: run the remaining detailed evaluation scripts.")
+    
+    from utils import setup_script_logging
+    logger = setup_script_logging("4_0_evaluation")
+    logger.info("Evaluation completed successfully")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

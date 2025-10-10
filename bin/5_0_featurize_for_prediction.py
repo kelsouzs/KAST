@@ -21,7 +21,6 @@ import warnings
 import logging
 from typing import List, Tuple, Optional
 import gc
-import tempfile
 import shutil
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -40,7 +39,11 @@ import deepchem as dc
 import pandas as pd
 from tqdm import tqdm
 from datetime import datetime
-import pickle
+import h5py
+from scipy.sparse import csr_matrix, vstack as sparse_vstack
+from multiprocessing import cpu_count
+from joblib import Parallel, delayed
+import platform
 
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
@@ -53,11 +56,159 @@ import settings as cfg
 from utils import ensure_dir_exists, load_smiles_from_file
 from deepchem.data import DiskDataset  
 
+# ============================================================================
+# PARALLEL FEATURIZATION FUNCTIONS (Cross-platform: Windows + Linux)
+# ============================================================================
+
+def featurize_smiles_chunk(smiles_chunk: List[str], fp_size: int, fp_radius: int) -> Tuple[List, List, int, int]:
+    """
+    Featurizes a chunk of SMILES in a separate process.
+    Joblib handles data transfer efficiently (shared memory when possible).
+    
+    Args:
+        smiles_chunk: List of SMILES strings to featurize
+        fp_size: Fingerprint size (e.g., 2048)
+        fp_radius: Fingerprint radius (e.g., 2)
+    
+    Returns:
+        Tuple of (features_list, valid_smiles, successful_count, failed_count)
+    """
+    try:
+        # Suppress ALL warnings in worker processes
+        import warnings
+        warnings.filterwarnings('ignore')
+        import os
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+        
+        # Suppress RDKit warnings
+        from rdkit import RDLogger
+        RDLogger.DisableLog('rdApp.*')
+        
+        # Suppress TensorFlow/DeepChem logging
+        import logging
+        logging.getLogger('tensorflow').setLevel(logging.ERROR)
+        logging.getLogger('deepchem').setLevel(logging.ERROR)
+        
+        # Each process needs its own featurizer instance
+        import deepchem as dc
+        import numpy as np
+        featurizer = dc.feat.CircularFingerprint(size=fp_size, radius=fp_radius)
+        
+        features_list = []
+        valid_smiles = []
+        successful = 0
+        failed = 0
+        
+        for smiles in smiles_chunk:
+            try:
+                features = featurizer.featurize([smiles])
+                if features is not None and len(features) > 0 and features[0] is not None:
+                    if features[0].size > 0:
+                        features_list.append(features[0].astype(np.float32))
+                        valid_smiles.append(smiles)
+                        successful += 1
+                    else:
+                        failed += 1
+                else:
+                    failed += 1
+            except Exception:
+                failed += 1
+        
+        return features_list, valid_smiles, successful, failed
+    except Exception as e:
+        # If worker crashes, return empty results
+        print(f"⚠️ Worker error: {e}")
+        return [], [], 0, len(smiles_chunk)
+
+
+def get_optimal_workers() -> int:
+    """
+    Determines optimal number of workers based on settings.py configuration.
+    Falls back to auto-detection if N_WORKERS is None.
+    Cross-platform: works on Windows, Linux, macOS.
+    """
+    # Use configuration from settings.py
+    if cfg.N_WORKERS is not None:
+        if cfg.N_WORKERS == -1:
+            # Use all cores
+            n_cpus = cpu_count() or 4
+            return n_cpus
+        elif cfg.N_WORKERS >= 1:
+            # Use specified number
+            return cfg.N_WORKERS
+    
+    # Auto-detect (N_WORKERS = None)
+    try:
+        n_cpus = cpu_count()
+        if n_cpus is None:
+            n_cpus = 4  # Fallback
+        
+        # Use n-1 cores to keep system responsive, minimum 1
+        optimal = max(1, n_cpus - 1)
+        return optimal
+    except Exception as e:
+        print(f"\n⚠️  Could not detect CPU count: {e}")
+        print(f"Using 4 workers")
+        return 4
+
+
+def split_into_chunks(smiles_list: List[str], n_chunks: int) -> List[List[str]]:
+    """
+    Splits SMILES list into roughly equal chunks for parallel processing.
+    """
+    chunk_size = len(smiles_list) // n_chunks
+    remainder = len(smiles_list) % n_chunks
+    
+    chunks = []
+    start = 0
+    
+    for i in range(n_chunks):
+        # Distribute remainder across first chunks
+        extra = 1 if i < remainder else 0
+        end = start + chunk_size + extra
+        chunks.append(smiles_list[start:end])
+        start = end
+    
+    return chunks
+
+
+# ============================================================================
+
+def check_disk_space(required_gb: float) -> bool:
+    """Check if there's enough disk space available."""
+    try:
+        import psutil
+        disk_usage = psutil.disk_usage(os.path.dirname(cfg.PREDICTION_FEATURIZED_DIR))
+        available_gb = disk_usage.free / (1024**3)
+        
+        print(f"\n💾 Disk Space Check:")
+        print(f"Available: {available_gb:.1f} GB")
+        print(f"Required:  ~{required_gb:.1f} GB")
+        
+        if available_gb < required_gb:
+            print(f"\n⚠️ WARNING: Insufficient disk space!")
+            print(f"You need at least {required_gb:.1f} GB free")
+            print(f"Current free space: {available_gb:.1f} GB")
+            return False
+        elif available_gb < required_gb * 1.5:
+            print(f"⚠️ Space is tight! Recommend having {required_gb*1.5:.1f} GB free")
+        else:
+            print(f"✅ Sufficient space available")
+        
+        return True
+    except ImportError:
+        print("\n⚠️ Cannot check disk space (psutil not installed)")
+        print("   Proceeding anyway...")
+        return True
+    except Exception as e:
+        print(f"\n⚠️ Error checking disk space: {e}")
+        return True
+
 def select_input_file() -> Optional[str]:
     """Allows the user to interactively select a SMILES file from the /data folder."""
     data_dir = os.path.join(project_root, 'data')
 
-    print(f"\n📁 Searching for SMILES files in folder: {data_dir}")
+    print(f"📁 Searching for SMILES files in folder: {data_dir}")
     
     if not os.path.exists(data_dir):
         print(f"\n❌ ERROR: '/data' folder not found at: {data_dir}")
@@ -79,23 +230,46 @@ def select_input_file() -> Optional[str]:
         size_mb = os.path.getsize(file_path) / 1024 / 1024
         print(f"  {i:2}. {file:<30} ({size_mb:.2f} MB)")
     print("-" * 60)
+    print(f"  [0] Cancel and return to menu")
+    
+    invalid_attempts = 0
+    max_attempts = 3
     
     while True:
         try:
             choice = input(f"\nSelect file (1-{len(available_files)}): ").strip()
             if not choice:
                 print("❌ Empty input. Enter a number.")
+                invalid_attempts += 1
+                if invalid_attempts >= max_attempts:
+                    print(f"\n⚠️ Too many invalid attempts. Returning to menu...")
+                    return None
                 continue
+            
             choice_num = int(choice)
+            
+            # Allow user to cancel with 0
+            if choice_num == 0:
+                print("\n⚠️ Operation cancelled by user.")
+                return None
+            
             if 1 <= choice_num <= len(available_files):
                 selected_file = available_files[choice_num - 1]
                 selected_path = os.path.join(data_dir, selected_file)
                 print(f"\n✅ Selected file: {selected_file}")
                 return selected_path
             else:
-                print(f"❌ Invalid number. Enter between 1 and {len(available_files)}.")
+                print(f"❌ Invalid number. Enter 0 to cancel or 1-{len(available_files)} to select.")
+                invalid_attempts += 1
+                if invalid_attempts >= max_attempts:
+                    print(f"\n⚠️ Too many invalid attempts. Returning to menu...")
+                    return None
         except ValueError:
             print("❌ Invalid input. Enter numbers only.")
+            invalid_attempts += 1
+            if invalid_attempts >= max_attempts:
+                print(f"\n⚠️ Too many invalid attempts. Returning to menu...")
+                return None
         except KeyboardInterrupt:
             print("\n\nOperation cancelled by user.")
             return None
@@ -106,6 +280,9 @@ def clean_previous_featurized_data():
 
     print(f"\n\033[93m ⚠️ WARNING: Previous featurized data found at:\033[0m")
     print(f"  {cfg.PREDICTION_FEATURIZED_DIR}")
+    
+    invalid_attempts = 0
+    max_attempts = 3
     
     while True:
         choice = input("\nDo you want to overwrite with new featurization? (y/n): ").lower()
@@ -122,6 +299,10 @@ def clean_previous_featurized_data():
             sys.exit(0)
         else:
             print("Invalid option. Type 'y' or 'n'.")
+            invalid_attempts += 1
+            if invalid_attempts >= max_attempts:
+                print(f"\n⚠️ Too many invalid attempts ({max_attempts}). Operation cancelled.")
+                sys.exit(0)
 
 def load_input_smiles(input_file_path: str) -> Optional[List[str]]:
     """Loads SMILES molecules from the specified input file."""
@@ -129,8 +310,8 @@ def load_input_smiles(input_file_path: str) -> Optional[List[str]]:
     
     if not os.path.exists(input_file_path):
         print(f"\n⚠️ ERROR: Input file '{input_file_path}' not found.")
-        print("➡️   Verify that the file exists in the correct location.")
-        print("➡️   File should contain one SMILES per line.")
+        print("➡️ Verify that the file exists in the correct location.")
+        print("➡️ File should contain one SMILES per line.")
         return None
     
     try:
@@ -147,6 +328,25 @@ def load_input_smiles(input_file_path: str) -> Optional[List[str]]:
         if duplicates > 0:
             print(f"\n⚠️ {duplicates} duplicate SMILES found")
             print(f" Using {len(unique_smiles)} unique SMILES")
+            final_count = len(unique_smiles)
+        else:
+            final_count = len(smiles_list)
+        
+        # Estimate disk space needed
+        # Each molecule: 2048 features × 4 bytes (float32) = 8 KB
+        # Plus overhead for DiskDataset structure ≈ 2x
+        estimated_gb = (final_count * 2048 * 4 * 2) / (1024**3)
+        
+        # Check disk space
+        if not check_disk_space(estimated_gb):
+            print("\n❌ Cannot proceed due to insufficient disk space!")
+            print("\n💡 Solutions:")
+            print("1. Free up disk space")
+            print("2. Process fewer molecules (sample the dataset)")
+            print("3. Change output directory to a drive with more space")
+            return None
+        
+        if duplicates > 0:
             return unique_smiles
         
         return smiles_list
@@ -155,137 +355,273 @@ def load_input_smiles(input_file_path: str) -> Optional[List[str]]:
         print(f"\n⚠️ ERROR loading SMILES file: {e}")
         return None
 
+def cleanup_temp_files(temp_dir: str, partial_output_dir: str = None):
+    """Emergency cleanup function to free disk space."""
+    print("\n🧹 Cleaning up temporary files...")
+    cleaned_size = 0
+    
+    try:
+        # Clean temp directory
+        if temp_dir and os.path.exists(temp_dir):
+            for root, dirs, files in os.walk(temp_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    try:
+                        size = os.path.getsize(file_path)
+                        os.remove(file_path)
+                        cleaned_size += size
+                    except:
+                        pass
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
+        
+        # Clean partial output if requested
+        if partial_output_dir and os.path.exists(partial_output_dir):
+            try:
+                shutil.rmtree(partial_output_dir)
+                print(f"Removed incomplete output: {partial_output_dir}")
+            except:
+                pass
+        
+        if cleaned_size > 0:
+            size_mb = cleaned_size / (1024 * 1024)
+            print(f"✅ Freed ~{size_mb:.1f} MB of disk space")
+        
+        # Force garbage collection
+        gc.collect()
+        
+    except Exception as e:
+        print(f"⚠️ Error during cleanup: {e}")
+
 def featurize_and_save_to_disk(smiles_list: List[str]) -> Tuple[bool, dict]:
-    """Featurizes molecules in batches and saves them as a DeepChem DiskDataset."""
-    print(f"\nStarting featurization of {len(smiles_list)} molecules...")
+    """
+    Featurizes molecules and saves them in Sparse + HDF5 format.
+    Uses settings from settings.py (cfg.ENABLE_PARALLEL_PROCESSING, cfg.N_WORKERS).
+    
+    Args:
+        smiles_list: List of SMILES strings
+    
+    Returns:
+        Tuple of (success_bool, stats_dict)
+    """
+    print(f"\n🚀 Starting featurization of {len(smiles_list):,} molecules...")
+    
+    # Determine if parallel processing should be used based on settings
+    use_parallel = (cfg.ENABLE_PARALLEL_PROCESSING and 
+                    len(smiles_list) >= cfg.PARALLEL_MIN_THRESHOLD)
+    
     stats = {
         'total_input': len(smiles_list),
         'successful': 0,
         'failed': 0,
         'invalid_smiles': [],
-        'start_time': datetime.now()
+        'start_time': datetime.now(),
+        'space_saved_percent': 0,
+        'parallel_used': use_parallel
     }
     
     try:
-        temp_dir = tempfile.mkdtemp(prefix='kast_featurization_')
-        featurizer = dc.feat.CircularFingerprint(size=cfg.FP_SIZE, radius=cfg.FP_RADIUS)
-        
-        valid_smiles = []
-        batch_size = 5000  
-        print("\nStarting featurization...")
-        progress_bar = tqdm(total=len(smiles_list), desc="Featurizing")
-        batch_files = []
-
-        for batch_idx, start_idx in enumerate(range(0, len(smiles_list), batch_size)):
-            end_idx = min(start_idx + batch_size, len(smiles_list))
-            batch_smiles = smiles_list[start_idx:end_idx]
-            batch_features = []
-            batch_valid_smiles = []
+        # ============ PARALLEL FEATURIZATION ============
+        if use_parallel:
+            # Get number of workers from settings
+            n_workers = get_optimal_workers()
             
-            for i, smiles in enumerate(batch_smiles):
-                global_idx = start_idx + i
+            system = platform.system()
+            print(f"⚡ Parallel featurization enabled")
+            print("\n⚠️ If process fails, data will be automatically cleaned up.")
+            
+            # Use batch size from settings
+            batch_size = cfg.PARALLEL_BATCH_SIZE
+            n_batches = (len(smiles_list) + batch_size - 1) // batch_size
+            
+            all_features = []
+            all_valid_smiles = []
+            
+            print(f"\n📊 Processing {len(smiles_list):,} molecules in {n_batches} batches...")
+            print(f"  • Batch size: {batch_size:,} molecules")
+            print(f"  • Workers per batch: {n_workers}")
+            
+            for batch_idx in range(n_batches):
+                start_idx = batch_idx * batch_size
+                end_idx = min(start_idx + batch_size, len(smiles_list))
+                batch_smiles = smiles_list[start_idx:end_idx]
+                
+                print(f"\n🔄 Batch {batch_idx+1}/{n_batches}: Processing {len(batch_smiles):,} molecules ({start_idx:,} to {end_idx:,})...")
+                
+                # Split batch into chunks for parallel processing
+                smiles_chunks = split_into_chunks(batch_smiles, n_workers)
+                
+                # Process batch in parallel
+                results = Parallel(n_jobs=n_workers, verbose=5, backend='loky')(
+                    delayed(featurize_smiles_chunk)(chunk, cfg.FP_SIZE, cfg.FP_RADIUS)
+                    for chunk in smiles_chunks
+                )
+                
+                # Aggregate batch results
+                for features_list, valid_smiles, successful, failed in results:
+                    all_features.extend(features_list)
+                    all_valid_smiles.extend(valid_smiles)
+                    stats['successful'] += successful
+                    stats['failed'] += failed
+                
+                print(f"✅ Batch {batch_idx+1} complete: {stats['successful']:,} success, {stats['failed']:,} failed")
+                
+                # Free memory after each batch
+                del results
+                gc.collect()
+            
+            print(f"\n✅ All done!")
+            print(f"   Total processed: {stats['successful'] + stats['failed']:,}")
+            print(f"   Successful: {stats['successful']:,}")
+            print(f"   Failed: {stats['failed']:,}")
+            
+        # ============ SEQUENTIAL FEATURIZATION (FALLBACK) ============
+        else:
+            print(f"\n📝 Sequential featurization (single-threaded)")
+            print("⚠️ If process fails, temporary files will be automatically cleaned up.")
+            
+            featurizer = dc.feat.CircularFingerprint(size=cfg.FP_SIZE, radius=cfg.FP_RADIUS)
+            all_features = []
+            all_valid_smiles = []
+            
+            for smiles in tqdm(smiles_list, desc="Featurizing (sequential)"):
                 try:
                     features = featurizer.featurize([smiles])
                     if features is not None and len(features) > 0 and features[0] is not None:
                         if features[0].size > 0:
-                            batch_features.append(features[0].astype(np.float32))
-                            batch_valid_smiles.append(smiles)
+                            all_features.append(features[0].astype(np.float32))
+                            all_valid_smiles.append(smiles)
                             stats['successful'] += 1
                         else:
                             stats['failed'] += 1
-                            if len(stats['invalid_smiles']) < 100:
-                                stats['invalid_smiles'].append(f"Line {global_idx+1}: {smiles[:50]}...")
                     else:
                         stats['failed'] += 1
-                        if len(stats['invalid_smiles']) < 100:
-                            stats['invalid_smiles'].append(f"Line {global_idx+1}: {smiles[:50]}...")
-                    progress_bar.update(1)
-                except Exception as e:
+                except Exception:
                     stats['failed'] += 1
-                    if len(stats['invalid_smiles']) < 100:
-                        stats['invalid_smiles'].append(f"Line {global_idx+1}: {smiles[:50]}... (Error: {str(e)[:30]})")
-                    progress_bar.update(1)
 
-            if batch_features:
-                batch_data = {
-                    'features': np.vstack(batch_features),
-                    'smiles': batch_valid_smiles
-                }
-                batch_file = os.path.join(temp_dir, f'batch_{batch_idx:04d}.pkl')
-                with open(batch_file, 'wb') as f:
-                    pickle.dump(batch_data, f)
-                batch_files.append(batch_file)
-                valid_smiles.extend(batch_valid_smiles)
-                del batch_features, batch_valid_smiles, batch_data
-                gc.collect()
+        # ============ VALIDATION ============
+        if stats['successful'] == 0:
+            print("\n❌ ERROR: No molecule could be featurized.")
+            cleanup_temp_files(None, cfg.PREDICTION_FEATURIZED_DIR)
+            return False, stats
         
-        progress_bar.close()
+        # ============ CONVERT TO SPARSE FORMAT ============
         stats['end_time'] = datetime.now()
         stats['duration'] = stats['end_time'] - stats['start_time']
         
-        if stats['successful'] == 0:
-            print("\n❌ ERROR: No molecule could be featurized.")
-            shutil.rmtree(temp_dir)
+        # Stack features into numpy array
+        if all_features:
+            features_dense = np.vstack(all_features)
+            del all_features
+            gc.collect()
+        else:
+            print("\n❌ ERROR: No features to save.")
+            cleanup_temp_files(None, cfg.PREDICTION_FEATURIZED_DIR)
             return False, stats
-
-        chunk_size = 10  
-        all_features_chunks = []
-        all_smiles_final = []
-        for i in range(0, len(batch_files), chunk_size):
-            chunk_files = batch_files[i:i+chunk_size]
-            chunk_features = []
-            for batch_file in chunk_files:
-                with open(batch_file, 'rb') as f:
-                    batch_data = pickle.load(f)
-                    chunk_features.append(batch_data['features'])
-                    all_smiles_final.extend(batch_data['smiles'])
-                os.remove(batch_file)
-            if chunk_features:
-                chunk_combined = np.vstack(chunk_features)
-                chunk_file = os.path.join(temp_dir, f'chunk_{i//chunk_size:04d}.npy')
-                np.save(chunk_file, chunk_combined)
-                all_features_chunks.append(chunk_file)
-                del chunk_features, chunk_combined
-                gc.collect()
-
-        print("Saving...")
-        ensure_dir_exists(cfg.PREDICTION_FEATURIZED_DIR)
-        feature_chunks = []
-        for chunk_file in all_features_chunks:
-            chunk_data = np.load(chunk_file)
-            feature_chunks.append(chunk_data)
-            os.remove(chunk_file)
         
-        final_features = np.vstack(feature_chunks)
-        dummy_labels = np.zeros(len(all_smiles_final), dtype=np.float32)
+        all_features_sparse = csr_matrix(features_dense)
+        del features_dense
+        gc.collect()
+        
+        # Calculate space savings
+        dense_size_gb = (stats['successful'] * cfg.FP_SIZE * 4) / (1024**3)  # float32
+        sparse_size_mb = (all_features_sparse.data.nbytes + 
+                          all_features_sparse.indices.nbytes + 
+                          all_features_sparse.indptr.nbytes) / (1024**2)
+        sparse_size_gb = sparse_size_mb / 1024
+        stats['space_saved_percent'] = ((dense_size_gb - sparse_size_gb) / dense_size_gb) * 100
+        
+        # ============ SAVE TO HDF5 WITH COMPRESSION ============
+        print("\n💾 Saving...")
+        ensure_dir_exists(cfg.PREDICTION_FEATURIZED_DIR)
+        hdf5_path = os.path.join(cfg.PREDICTION_FEATURIZED_DIR, 'featurized_data.h5')
+        
+        try:
+            with h5py.File(hdf5_path, 'w') as h5f:
+                # Save sparse matrix components with compression
+                h5f.create_dataset('data', data=all_features_sparse.data, 
+                                   compression='gzip', compression_opts=9)
+                h5f.create_dataset('indices', data=all_features_sparse.indices, 
+                                   compression='gzip', compression_opts=9)
+                h5f.create_dataset('indptr', data=all_features_sparse.indptr, 
+                                   compression='gzip', compression_opts=9)
+                h5f.create_dataset('shape', data=all_features_sparse.shape)
+                
+                # Save SMILES as strings
+                dt = h5py.string_dtype(encoding='utf-8')
+                h5f.create_dataset('smiles', data=all_valid_smiles, dtype=dt,
+                                   compression='gzip', compression_opts=9)
+                
+                # Save metadata
+                h5f.attrs['total_molecules'] = stats['successful']
+                h5f.attrs['fp_size'] = cfg.FP_SIZE
+                h5f.attrs['fp_radius'] = cfg.FP_RADIUS
+                h5f.attrs['format'] = 'sparse_csr'
+                h5f.attrs['space_saved_percent'] = stats['space_saved_percent']
+                h5f.attrs['parallel_used'] = stats['parallel_used']
+            
+            
+            print(f"\n✅ Featurization completed:")
+            print(f" • Successes: {stats['successful']}")
+            print(f" • Failures: {stats['failed']}")
+            print(f" • Dataset saved: {hdf5_path}")
+                
+        except MemoryError as mem_err:
+            print(f"\n💥 MEMORY ERROR during save!")
+            print(f"Error: {mem_err}")
+            raise
+        except OSError as disk_err:
+            print(f"\n💾 DISK ERROR during save!")
+            print(f"Error: {disk_err}")
+            print(f"Possible causes: Out of disk space, disk write failure")
+            raise
 
-        dataset = DiskDataset.from_numpy(
-            X=final_features,
-            y=dummy_labels,
-            ids=all_smiles_final,
-            data_dir=cfg.PREDICTION_FEATURIZED_DIR
-        )
-
-        print(f"\n✅ Featurization completed:")
-        print(f"     • Successes: {stats['successful']}")
-        print(f"     • Failures: {stats['failed']}")
-        print(f"     • Success rate: {stats['successful']/stats['total_input']*100:.1f}%")
-        print(f"     • Dataset saved: {cfg.PREDICTION_FEATURIZED_DIR}")
-
-        shutil.rmtree(temp_dir)
-        del final_features, dataset, dummy_labels, feature_chunks
+        # Successful completion
+        del all_features_sparse, all_valid_smiles
         gc.collect()
         
         return True, stats
         
+    except MemoryError as mem_err:
+        print(f"\n💥 CRITICAL: Out of Memory!")
+        print(f"Attempted to allocate memory but failed: {mem_err}")
+        print(f"Recommendation: Process fewer molecules or increase system RAM")
+        cleanup_temp_files(None, cfg.PREDICTION_FEATURIZED_DIR)
+        stats['end_time'] = datetime.now()
+        stats['duration'] = stats.get('end_time', datetime.now()) - stats['start_time']
+        return False, stats
+        
+    except OSError as disk_err:
+        print(f"\n💾 CRITICAL: Disk Error!")
+        print(f"{disk_err}")
+        if "space" in str(disk_err).lower() or "102400000" in str(disk_err):
+            print(f"Likely cause: Insufficient disk space")
+            print(f"Recommendation: Free up disk space or change output directory")
+        cleanup_temp_files(None, cfg.PREDICTION_FEATURIZED_DIR)
+        stats['end_time'] = datetime.now()
+        stats['duration'] = stats.get('end_time', datetime.now()) - stats['start_time']
+        return False, stats
+        
+    except KeyboardInterrupt:
+        print(f"\n\n⚠️ Process interrupted by user!")
+        cleanup_temp_files(None, cfg.PREDICTION_FEATURIZED_DIR)
+        stats['end_time'] = datetime.now()
+        stats['duration'] = stats.get('end_time', datetime.now()) - stats['start_time']
+        return False, stats
+        
     except Exception as e:
         print(f"\n ⚠️ ERROR during featurization: {e}")
-        try:
-            if 'temp_dir' in locals():
-                shutil.rmtree(temp_dir)
-        except:
-            pass
+        print(f"Error type: {type(e).__name__}")
+        cleanup_temp_files(None, cfg.PREDICTION_FEATURIZED_DIR)
+        stats['end_time'] = datetime.now()
+        stats['duration'] = stats.get('end_time', datetime.now()) - stats['start_time']
         return False, stats
+        
+    finally:
+        # Final garbage collection
+        gc.collect()
 
 def generate_featurization_report(stats: dict, success: bool) -> str:
     status_text = "SUCCESS" if success else "FAILURE"
@@ -306,11 +642,21 @@ Success rate: {stats['successful']/stats['total_input']*100:.2f}%
 Type: Morgan Circular Fingerprints
 Radius: {cfg.FP_RADIUS}
 Size: {cfg.FP_SIZE} bits
-Save method: Temporary files (Windows-compatible)
+Save format: Sparse CSR + HDF5 with gzip compression
+Space saved: {stats.get('space_saved_percent', 0):.1f}%
+Parallel processing: {'Yes' if stats.get('parallel_used', False) else 'No'}
+System: {platform.system()} {platform.release()}
 
 === OUTPUT DATA ===
 Output directory: {cfg.PREDICTION_FEATURIZED_DIR}
 Valid molecules saved: {stats['successful']}
+File: featurized_data.h5
+
+=== ERROR HANDLING ===
+Automatic cleanup on failure: ENABLED
+Memory error detection: ENABLED
+Disk error detection: ENABLED
+Interrupt handling (Ctrl+C): ENABLED
 """
     if stats['failed'] > 0:
         report += f"\n=== FAILED MOLECULES ({min(stats['failed'], 10)} first) ===\n"
@@ -348,17 +694,43 @@ def display_summary(stats: dict, success: bool):
         print(f"  Processing time            : {duration_str}")
         print("=========================================================")
 
+def display_parallel_config(n_molecules: int):
+    """Display parallel processing configuration from settings.py."""
+    print(f"\n⚙️ Parallel Processing Configuration (from settings.py):")
+    print(f"   • Dataset size: {n_molecules:,} molecules")
+    
+    if cfg.ENABLE_PARALLEL_PROCESSING and n_molecules >= cfg.PARALLEL_MIN_THRESHOLD:
+        n_workers = get_optimal_workers()
+        print(f"   • Workers to use: {n_workers}")
+        print(f"   • Batch size: {cfg.PARALLEL_BATCH_SIZE:,} molecules")
+        print(f"✅ Parallel processing will be used")
+    elif cfg.ENABLE_PARALLEL_PROCESSING:
+        print(f"⚠️ Dataset too small, using sequential processing")
+    else:
+        print(f"⚠️ Parallel processing disabled in settings.py")
+    
+
 def main():
-    print("\n--- K-talysticFlow | Step 5.0: Featurization for Prediction ---")
+    from utils import print_script_banner, setup_script_logging
+    logger = setup_script_logging("5_0_featurize_prediction")
+    
+    print_script_banner("K-talysticFlow | Step 5.0: Featurization for Prediction")
+    logger.info("Starting featurization for prediction")
+    
     clean_previous_featurized_data()
     
     input_file_path = select_input_file()
     if input_file_path is None:
-        sys.exit(1)
+        logger.info("Operation cancelled by user")
+        sys.exit(0)  # Exit gracefully without error
     
     smiles_list = load_input_smiles(input_file_path)
     if smiles_list is None:
+        logger.error("Failed to load SMILES from input file")
         sys.exit(1)
+    
+    # Display parallel processing configuration
+    display_parallel_config(len(smiles_list))
     
     success, stats = featurize_and_save_to_disk(smiles_list)
     save_featurization_report(stats, success)
@@ -366,9 +738,13 @@ def main():
     
     if success:
         print("\n✅ Featurization completed successfully!")
-        print("\n➡️     Next Step: '[2] Only Predict'.")
+        if stats.get('parallel_used'):
+            print(f"⚡ Parallel processing used ({platform.system()})")
+        print("\n➡️ Next Step: '[2] Only Predict'.")
+        logger.info("Featurization for prediction completed successfully")
     else:
         print("\n❌ Featurization failed, check the report file!")
+        logger.error("Featurization for prediction failed")
         sys.exit(1)
 
 if __name__ == '__main__':

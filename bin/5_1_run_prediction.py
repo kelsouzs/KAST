@@ -36,6 +36,12 @@ import pandas as pd
 import deepchem as dc
 import numpy as np
 from tqdm import tqdm
+import h5py
+from scipy.sparse import csr_matrix
+from multiprocessing import cpu_count
+from joblib import Parallel, delayed
+from typing import List
+import platform
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
@@ -43,6 +49,75 @@ if project_root not in sys.path:
 
 import settings as cfg
 from utils import ensure_dir_exists
+
+
+# ============================================================================
+# PARALLEL PREDICTION FUNCTIONS
+# ============================================================================
+
+def get_optimal_workers() -> int:
+    """Get optimal number of workers from settings.py configuration."""
+    if cfg.N_WORKERS is not None:
+        if cfg.N_WORKERS == -1:
+            return cpu_count() or 4
+        elif cfg.N_WORKERS >= 1:
+            return cfg.N_WORKERS
+    
+    # Auto-detect (N_WORKERS = None)
+    n_cpus = cpu_count() or 4
+    return max(1, n_cpus - 1)
+
+
+def predict_batch_worker(batch_data: Tuple[int, csr_matrix], model_dir: str, model_params: dict) -> Tuple[int, np.ndarray]:
+    """
+    Worker function to predict on a single batch.
+    Each worker loads its own model instance to avoid pickling issues.
+    
+    Args:
+        batch_data: Tuple of (batch_index, sparse_batch)
+        model_dir: Path to model directory
+        model_params: Model configuration parameters
+    
+    Returns:
+        Tuple of (batch_index, predictions)
+    """
+    try:
+        import warnings
+        warnings.filterwarnings('ignore')
+        import os
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+        
+        import deepchem as dc
+        import numpy as np
+        
+        batch_idx, batch_sparse = batch_data
+        
+        # Each worker needs its own model instance
+        n_features = batch_sparse.shape[1]
+        model = dc.models.MultitaskClassifier(
+            n_tasks=model_params['n_tasks'],
+            n_features=n_features,
+            layer_sizes=model_params['layer_sizes'],
+            dropouts=model_params['dropouts'],
+            mode=model_params['mode'],
+            learning_rate=model_params['learning_rate'],
+            model_dir=model_dir
+        )
+        model.restore()
+        
+        # Convert batch to dense and predict
+        batch_dense = batch_sparse.toarray()
+        batch_preds = model.predict_on_batch(batch_dense)
+        
+        return batch_idx, batch_preds
+        
+    except Exception as e:
+        print(f"⚠️ Worker error {batch_idx}: {e}")
+        # Return empty predictions on error
+        return batch_idx, np.array([])
+
+
+# ============================================================================
 
 
 def ensure_reproducibility(seed=42):
@@ -80,33 +155,72 @@ def generate_molecule_names(smiles_list, prefix="KAST"):
     return molecule_names
 
 
-def load_data_and_model() -> Optional[Tuple[dc.data.Dataset, dc.models.Model]]:
+def load_sparse_hdf5_data() -> Optional[Tuple[csr_matrix, list]]:
+    """Load sparse featurized data from HDF5 file."""
     from rdkit import RDLogger
     RDLogger.DisableLog('rdApp.*')
-    
-    print("\nLoading featurized dataset for prediction...")
-    
+
+    print("\n📦 Loading featurized dataset...")
+
     if not os.path.exists(cfg.PREDICTION_FEATURIZED_DIR):
         print(f"\nERROR: Directory '{cfg.PREDICTION_FEATURIZED_DIR}' not found.")
         print("➡️ Run '[5] -> [1] Prepare database' first.")
         return None, None
     
-    try:
-        prediction_dataset = dc.data.DiskDataset(cfg.PREDICTION_FEATURIZED_DIR)
-        print(f"\n✅ Dataset loaded: {len(prediction_dataset)} molecules")
-    except Exception as e:
-        print(f"\n⚠️ ERROR loading featurized dataset: {e}")
+    hdf5_path = os.path.join(cfg.PREDICTION_FEATURIZED_DIR, 'featurized_data.h5')
+    
+    if not os.path.exists(hdf5_path):
+        print(f"\nERROR: file not found at '{hdf5_path}'")
+        print("➡️ Run step 5.0 to featurize your data first.")
         return None, None
     
-    print(f"\nLoading trained model...")
+    try:
+        with h5py.File(hdf5_path, 'r') as h5f:
+            # Load sparse matrix components
+            data = h5f['data'][:]
+            indices = h5f['indices'][:]
+            indptr = h5f['indptr'][:]
+            shape = tuple(h5f['shape'][:])
+            
+            # Reconstruct sparse matrix
+            features_sparse = csr_matrix((data, indices, indptr), shape=shape)
+            
+            # Load SMILES
+            smiles_list = [s.decode('utf-8') if isinstance(s, bytes) else s 
+                          for s in h5f['smiles'][:]]
+            
+            # Load metadata
+            total_molecules = h5f.attrs['total_molecules']
+            space_saved = h5f.attrs.get('space_saved_percent', 0)
+            
+            file_size_mb = os.path.getsize(hdf5_path) / (1024**2)
+            
+            print(f"\n✅ Dataset loaded successfully:")
+            print(f"  • Molecules: {total_molecules:,}")
+            
+            return features_sparse, smiles_list
+            
+    except Exception as e:
+        print(f"\n⚠️ ERROR loading dataset: {e}")
+        return None, None
+
+
+def load_data_and_model() -> Optional[Tuple]:
+    """Load sparse data and trained model."""
+    # Load sparse features
+    features_sparse, smiles_list = load_sparse_hdf5_data()
+    if features_sparse is None:
+        return None, None, None
+    
+    print(f"\n🤖 Loading trained model...")
 
     if not os.path.exists(cfg.MODEL_DIR):
         print(f"\n ⚠️ ERROR: Model '{cfg.MODEL_DIR}' not found.")
         print("➡️ Run '[3] Train Model' first.")
-        return None, None
+        return None, None, None
         
     try:
-        n_features = prediction_dataset.get_shape()[0][1]
+        n_features = features_sparse.shape[1]
         
         model = dc.models.MultitaskClassifier(
             n_tasks=cfg.MODEL_PARAMS['n_tasks'],
@@ -119,31 +233,83 @@ def load_data_and_model() -> Optional[Tuple[dc.data.Dataset, dc.models.Model]]:
         )
         
         model.restore()
-        print("\n✅ Model loaded successfully")
+        print("✅ Model loaded successfully")
         
-        return prediction_dataset, model
+        return features_sparse, smiles_list, model
         
     except Exception as e:
         print(f"\n⚠️ ERROR loading model: {e}")
-        return None, None
+        return None, None, None
 
 
-def run_prediction(model: dc.models.Model, dataset: dc.data.Dataset) -> pd.DataFrame:
-    print(f"\nRunning predictions for {len(dataset)} molecules...")
+def run_prediction(model: dc.models.Model, features_sparse: csr_matrix, smiles_list: list) -> pd.DataFrame:
+    """
+    Run predictions on sparse feature matrix.
+    Uses parallel processing if enabled in settings.py.
+    """
+    print(f"\n🔮 Running predictions for {len(smiles_list):,} molecules...")
     
     try:
-        y_pred_proba_list = []
         batch_size = 512
-        total_batches = len(dataset) // batch_size + (1 if len(dataset) % batch_size != 0 else 0)
-        print(f"\nStarting...")
+        total_molecules = features_sparse.shape[0]
+        total_batches = (total_molecules + batch_size - 1) // batch_size
         
-        for X, _, _, _ in tqdm(dataset.iterbatches(batch_size), 
-                               total=total_batches, 
-                               desc="Prediction Progress"):
-            batch_preds = model.predict_on_batch(X)
-            y_pred_proba_list.append(batch_preds)
+        # Check if parallel processing should be used
+        use_parallel = (cfg.ENABLE_PARALLEL_PROCESSING and 
+                        total_molecules >= cfg.PARALLEL_MIN_THRESHOLD)
+        
+        if use_parallel:
+            # PARALLEL PREDICTION
+            n_workers = get_optimal_workers()
+            print(f"\n⚡ Using parallel prediction:")
+            
+            # Prepare batches
+            batches = []
+            for i in range(0, total_molecules, batch_size):
+                end_idx = min(i + batch_size, total_molecules)
+                batch_sparse = features_sparse[i:end_idx]
+                batches.append((i // batch_size, batch_sparse))
+            
+            # Process batches in parallel
+            print(f"\n🚀 Processing in parallel...")
+            results = Parallel(n_jobs=n_workers, verbose=5, backend='loky')(
+                delayed(predict_batch_worker)(batch, cfg.MODEL_DIR, cfg.MODEL_PARAMS)
+                for batch in batches
+            )
+            
+            # Sort results by batch index and concatenate
+            results.sort(key=lambda x: x[0])
+            y_pred_proba_list = [pred for _, pred in results if len(pred) > 0]
+            
+            if not y_pred_proba_list:
+                print("\n❌ ERROR: No predictions generated")
+                return pd.DataFrame()
+            
+            y_pred_proba_raw = np.concatenate(y_pred_proba_list, axis=0)
+            print(f"\n✅ Prediction complete!")
+            
+        else:
+            # SEQUENTIAL PREDICTION (fallback)
+            print(f"\n📝 Using sequential prediction")
+            if not cfg.ENABLE_PARALLEL_PROCESSING:
+                print(f"   • Reason: Parallel processing disabled in settings.py")
+            else:
+                print(f"   • Reason: Dataset < {cfg.PARALLEL_MIN_THRESHOLD:,} molecules")
+            
+            y_pred_proba_list = []
+            
+            print(f"\nProcessing {total_batches} batches...")
+            for i in tqdm(range(0, total_molecules, batch_size), 
+                          total=total_batches, 
+                          desc="Prediction Progress"):
+                end_idx = min(i + batch_size, total_molecules)
+                batch_sparse = features_sparse[i:end_idx]
+                batch_dense = batch_sparse.toarray()
+                batch_preds = model.predict_on_batch(batch_dense)
+                y_pred_proba_list.append(batch_preds)
+                del batch_sparse, batch_dense
 
-        y_pred_proba_raw = np.concatenate(y_pred_proba_list, axis=0)
+            y_pred_proba_raw = np.concatenate(y_pred_proba_list, axis=0)
 
         if y_pred_proba_raw.ndim == 3:
             y_pred_proba_active = y_pred_proba_raw[:, 0, 1]
@@ -153,11 +319,11 @@ def run_prediction(model: dc.models.Model, dataset: dc.data.Dataset) -> pd.DataF
             print(f"\n⚠️ WARNING: Unexpected prediction shape: {y_pred_proba_raw.shape}")
             y_pred_proba_active = y_pred_proba_raw.flatten()
 
-        molecule_names = generate_molecule_names(dataset.ids, prefix="KAST")
+        molecule_names = generate_molecule_names(smiles_list, prefix="KAST")
         
         results_df = pd.DataFrame({
             'molecule_name': molecule_names,
-            'smiles': dataset.ids,
+            'smiles': smiles_list,
             'K-prediction Score': y_pred_proba_active
         })
 
@@ -170,6 +336,8 @@ def run_prediction(model: dc.models.Model, dataset: dc.data.Dataset) -> pd.DataF
         
     except Exception as e:
         print(f"\n⚠️ ERROR during prediction: {e}")
+        import traceback
+        traceback.print_exc()
         return pd.DataFrame()
 
 
@@ -312,7 +480,7 @@ def save_smi_file(results_df: pd.DataFrame, output_path: str, export_type: str, 
         print(f"   🧬 Contains {count:,} molecules ({description})")
         
         if count == 0:
-            print("   ⚠️ Warning: No molecules met the specified criteria!")
+            print("⚠️ Warning: No molecules met the specified criteria!")
         
     except Exception as e:
         print(f"⚠️ ERROR saving SMI file: {e}")
@@ -381,19 +549,24 @@ def display_and_save_results(results_df: pd.DataFrame, custom_filename: str, smi
 def main():
     ensure_reproducibility(seed=42)
     
-    print("\n--- K-talysticFlow | Step 5.1: Running Predictions ---")
-    print("\n🔮 This script ONLY runs predictions on already featurized data")
+    from utils import print_script_banner, setup_script_logging
+    logger = setup_script_logging("5_1_run_prediction")
+    
+    print_script_banner("K-talysticFlow | Step 5.1: Running Predictions")
+    logger.info("Starting prediction on new molecules")
     
     loaded_assets = load_data_and_model()
     if loaded_assets[0] is None:
         print("\n❌ Failed to load data or model.")
+        logger.error("Failed to load data or model")
         sys.exit(1)
         
-    prediction_dataset, model = loaded_assets
+    features_sparse, smiles_list, model = loaded_assets
 
-    results_df = run_prediction(model, prediction_dataset)
+    results_df = run_prediction(model, features_sparse, smiles_list)
     if results_df.empty:
         print("\n❌ Prediction execution failed.")
+        logger.error("Prediction execution failed - no results generated")
         sys.exit(1)
     stats = display_prediction_statistics(results_df)
     custom_filename = get_custom_filename()
@@ -401,6 +574,7 @@ def main():
     display_and_save_results(results_df, custom_filename, smi_export_type, smi_value)
     
     print("\n✅ Prediction completed successfully!")
+    logger.info("Prediction completed successfully")
 
 
 if __name__ == '__main__':

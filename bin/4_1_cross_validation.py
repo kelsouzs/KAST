@@ -28,6 +28,11 @@ import sys
 import numpy as np
 import deepchem as dc
 from sklearn.metrics import roc_auc_score
+from multiprocessing import cpu_count
+from joblib import Parallel, delayed
+from typing import List, Tuple
+from tqdm import tqdm
+import platform
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
@@ -35,6 +40,72 @@ if project_root not in sys.path:
 
 import settings as cfg
 from utils import ensure_dir_exists, load_smiles_from_file
+
+
+# ============================================================================
+# PARALLEL FEATURIZATION FOR CROSS-VALIDATION
+# ============================================================================
+
+def get_optimal_workers() -> int:
+    """Get optimal number of workers from settings.py configuration."""
+    if cfg.N_WORKERS is not None:
+        if cfg.N_WORKERS == -1:
+            return cpu_count() or 4
+        elif cfg.N_WORKERS >= 1:
+            return cfg.N_WORKERS
+    n_cpus = cpu_count() or 4
+    return max(1, n_cpus - 1)
+
+
+def featurize_chunk(smiles_chunk: List[str], fp_size: int, fp_radius: int) -> List:
+    """Featurize a chunk of SMILES in parallel worker."""
+    try:
+        import warnings
+        warnings.filterwarnings('ignore')
+        import os
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+        
+        from rdkit import RDLogger
+        RDLogger.DisableLog('rdApp.*')
+        
+        import deepchem as dc
+        featurizer = dc.feat.CircularFingerprint(size=fp_size, radius=fp_radius)
+        features = featurizer.featurize(smiles_chunk)
+        return features
+    except Exception as e:
+        print(f"⚠️ Worker error: {e}")
+        return [None] * len(smiles_chunk)
+
+
+def featurize_parallel(smiles_list: List[str], fp_size: int, fp_radius: int) -> np.ndarray:
+    """Featurize SMILES using parallel processing."""
+    n_workers = get_optimal_workers()
+    
+    print(f"⚡ Parallel featurization: {n_workers} workers")
+    
+    # Split into chunks
+    chunk_size = len(smiles_list) // n_workers
+    if chunk_size == 0:
+        chunk_size = len(smiles_list)
+    
+    chunks = [smiles_list[i:i + chunk_size] for i in range(0, len(smiles_list), chunk_size)]
+    
+    # Process in parallel
+    results = Parallel(n_jobs=n_workers, verbose=5, backend='loky')(
+        delayed(featurize_chunk)(chunk, fp_size, fp_radius)
+        for chunk in chunks
+    )
+    
+    # Flatten results
+    features = []
+    for chunk_features in results:
+        features.extend(chunk_features)
+    
+    return np.array(features)
+
+
+# ============================================================================
+
 
 def ensure_cv_reproducibility(seed=42): 
     import random
@@ -83,15 +154,27 @@ def load_and_featurize_all_data():
         print(f"  -> Loaded inactive molecules: {len(inactives)}")
         print("  -> Featurizing entire dataset...")
         
-        featurizer = dc.feat.CircularFingerprint(size=cfg.FP_SIZE, radius=cfg.FP_RADIUS)
-        features = featurizer.featurize(all_smiles)
+        # Use parallel featurization if enabled and dataset is large enough
+        use_parallel = (cfg.ENABLE_PARALLEL_PROCESSING and 
+                        len(all_smiles) >= cfg.PARALLEL_MIN_THRESHOLD)
+        
+        if use_parallel:
+            print(f"  -> Using parallel featurization ({platform.system()})")
+            features = featurize_parallel(list(all_smiles), cfg.FP_SIZE, cfg.FP_RADIUS)
+        else:
+            if not cfg.ENABLE_PARALLEL_PROCESSING:
+                print(f"  -> Using sequential featurization (parallel disabled)")
+            else:
+                print(f"  -> Using sequential featurization (dataset < {cfg.PARALLEL_MIN_THRESHOLD:,})")
+            featurizer = dc.feat.CircularFingerprint(size=cfg.FP_SIZE, radius=cfg.FP_RADIUS)
+            features = featurizer.featurize(all_smiles)
         
         valid_indices = [i for i, x in enumerate(features) if x is not None and x.size > 0]
         features_valid = features[valid_indices]
         labels_valid = all_labels[valid_indices]
         smiles_valid = all_smiles[valid_indices]
         
-        print(f"  -> ✅ Successfully featurized {len(features_valid)} out of {len(all_smiles)} molecules.")
+        print(f"\n  -> Successfully featurized {len(features_valid)} out of {len(all_smiles)} molecules.")
         
         return dc.data.NumpyDataset(X=features_valid, y=labels_valid, ids=smiles_valid)
         
@@ -115,7 +198,7 @@ def run_cross_validation(dataset):
     cv_auc_scores = []
     
     for i, (train_fold, valid_fold) in enumerate(folds):
-        print(f"\n  Fold {i+1}/{cfg.N_FOLDS_CV}: Training...")
+        print(f" Fold {i+1}/{cfg.N_FOLDS_CV}: Training...")
         
         try:
             model_cv = dc.models.MultitaskClassifier(
@@ -139,10 +222,10 @@ def run_cross_validation(dataset):
             
             if len(np.unique(y_true_cv)) < 2:
                 fold_auc = np.nan
-                print(f"\n ⚠️ WARNING: Only one class in fold {i+1}. AUC not computed.")
+                print(f"\n WARNING: Only one class in fold {i+1}. AUC not computed.")
             else:
                 fold_auc = roc_auc_score(y_true_cv, y_pred_proba_cv)
-                print(f"\n ✅ Fold validation AUC: {fold_auc:.4f}")
+                print(f"\n Fold validation AUC: {fold_auc:.4f}")
             
             cv_auc_scores.append(fold_auc)
             
@@ -154,15 +237,12 @@ def run_cross_validation(dataset):
 
 def display_summary(mean_auc, std_auc):
     """Displays a formatted summary of cross-validation results."""
-    print("\n=========================================================")
-    print("==        CROSS-VALIDATION SUMMARY (K-FOLD)           ==")
-    print("=========================================================")
+    print("\n" + "-"*57)
+    print("CROSS-VALIDATION SUMMARY".center(57))
+    print("-"*57)
     print(f"  Mean AUC (average of folds) : {mean_auc:.4f}")
     print(f"  Std Dev (AUC)               : {std_auc:.4f}")
-    print("---------------------------------------------------------")
-    interpretation = "Excellent" if mean_auc > 0.85 else "Good" if mean_auc > 0.75 else "Moderate" if mean_auc > 0.65 else "Low"
-    print(f"  Interpretation             : {interpretation}")
-    print("=========================================================")
+    print("-"*57)
 
 def save_cv_results(scores):
     """Calculates statistics, saves, and returns cross-validation results."""
@@ -207,10 +287,15 @@ def save_cv_results(scores):
 def main():
     ensure_cv_reproducibility(seed=42)
     
-    print("\n--- K-talysticFlow | Step 4.1: Cross-Validation ---")
+    from utils import print_script_banner, setup_script_logging
+    logger = setup_script_logging("4_1_cross_validation")
+    
+    print_script_banner("K-talysticFlow | Step 4.1: Cross-Validation")
+    logger.info("Starting cross-validation")
 
     full_dataset = load_and_featurize_all_data()
     if full_dataset is None:
+        logger.error("Failed to load and featurize data")
         sys.exit(1)
 
     cv_scores = run_cross_validation(full_dataset)
@@ -223,8 +308,10 @@ def main():
         display_summary(mean_auc, std_auc)
         print("\n✅ Cross-Validation completed successfully!")
         print("\n➡️ Next step: run the remaining detailed evaluation scripts.")
+        logger.info("Cross-validation completed successfully")
     else:
         print("\n❌ Cross-Validation failed!")
+        logger.error("Cross-validation failed")
         sys.exit(1)
 
 if __name__ == '__main__':

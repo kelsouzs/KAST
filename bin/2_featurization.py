@@ -37,6 +37,13 @@ logging.getLogger('deepchem').setLevel('ERROR')
 import shutil
 from datetime import datetime
 import deepchem as dc
+import pandas as pd
+import numpy as np
+from typing import List, Tuple
+from multiprocessing import cpu_count
+from joblib import Parallel, delayed
+from tqdm import tqdm
+import platform
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
@@ -44,6 +51,158 @@ if project_root not in sys.path:
 
 import settings as cfg
 from utils import ensure_dir_exists
+
+
+# ============================================================================
+# PARALLEL FEATURIZATION FUNCTIONS
+# ============================================================================
+
+def get_optimal_workers() -> int:
+    """Get optimal number of workers from settings.py configuration."""
+    if cfg.N_WORKERS is not None:
+        if cfg.N_WORKERS == -1:
+            return cpu_count() or 4
+        elif cfg.N_WORKERS >= 1:
+            return cfg.N_WORKERS
+    
+    # Auto-detect (N_WORKERS = None)
+    n_cpus = cpu_count() or 4
+    return max(1, n_cpus - 1)
+
+
+def featurize_smiles_chunk_for_csv(chunk_data: List[Tuple[str, int]], 
+                                     fp_size: int, 
+                                     fp_radius: int) -> Tuple[List, List, List, int, int]:
+    """
+    Featurizes a chunk of SMILES with labels for train/test datasets.
+    
+    Args:
+        chunk_data: List of (smiles, label) tuples
+        fp_size: Fingerprint size
+        fp_radius: Fingerprint radius
+    
+    Returns:
+        Tuple of (features_list, smiles_list, labels_list, successful_count, failed_count)
+    """
+    try:
+        # Suppress warnings in worker
+        import warnings
+        warnings.filterwarnings('ignore')
+        import os
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+        
+        from rdkit import RDLogger
+        RDLogger.DisableLog('rdApp.*')
+        
+        import deepchem as dc
+        import numpy as np
+        
+        featurizer = dc.feat.CircularFingerprint(size=fp_size, radius=fp_radius)
+        
+        features_list = []
+        smiles_list = []
+        labels_list = []
+        successful = 0
+        failed = 0
+        
+        for smiles, label in chunk_data:
+            try:
+                features = featurizer.featurize([smiles])
+                if features is not None and len(features) > 0 and features[0] is not None:
+                    if features[0].size > 0:
+                        features_list.append(features[0].astype(np.float32))
+                        smiles_list.append(smiles)
+                        labels_list.append(label)
+                        successful += 1
+                    else:
+                        failed += 1
+                else:
+                    failed += 1
+            except Exception:
+                failed += 1
+        
+        return features_list, smiles_list, labels_list, successful, failed
+    except Exception as e:
+        print(f"⚠️ Worker error: {e}")
+        return [], [], [], 0, len(chunk_data)
+
+
+def split_into_chunks(data_list: List, n_chunks: int) -> List[List]:
+    """Split data into roughly equal chunks for parallel processing."""
+    chunk_size = len(data_list) // n_chunks
+    remainder = len(data_list) % n_chunks
+    
+    chunks = []
+    start = 0
+    
+    for i in range(n_chunks):
+        extra = 1 if i < remainder else 0
+        end = start + chunk_size + extra
+        chunks.append(data_list[start:end])
+        start = end
+    
+    return chunks
+
+
+def featurize_parallel(df: pd.DataFrame, fp_size: int, fp_radius: int) -> Tuple[np.ndarray, List[str], np.ndarray, int, int]:
+    """
+    Featurizes a DataFrame with parallel processing.
+    
+    Args:
+        df: DataFrame with 'smiles' and 'active' columns
+        fp_size: Fingerprint size
+        fp_radius: Fingerprint radius
+    
+    Returns:
+        Tuple of (features_array, smiles_list, labels_array, successful_count, failed_count)
+    """
+    n_workers = get_optimal_workers()
+    
+    print(f"\n⚡ Using parallel featurization:")
+    
+    # Prepare data as list of (smiles, label) tuples
+    data_list = list(zip(df[cfg.SMILES_COL].tolist(), df[cfg.LABEL_COL].tolist()))
+    
+    # Split into chunks
+    chunks = split_into_chunks(data_list, n_workers)
+    
+    # Process in parallel
+    print(f"\n🚀 Processing in parallel...")
+    results = Parallel(n_jobs=n_workers, verbose=5, backend='loky')(
+        delayed(featurize_smiles_chunk_for_csv)(chunk, fp_size, fp_radius)
+        for chunk in chunks
+    )
+    
+    # Aggregate results
+    all_features = []
+    all_smiles = []
+    all_labels = []
+    total_successful = 0
+    total_failed = 0
+    
+    for features_list, smiles_list, labels_list, successful, failed in results:
+        all_features.extend(features_list)
+        all_smiles.extend(smiles_list)
+        all_labels.extend(labels_list)
+        total_successful += successful
+        total_failed += failed
+    
+    # Convert to arrays
+    if all_features:
+        features_array = np.vstack(all_features)
+        labels_array = np.array(all_labels)
+    else:
+        features_array = np.array([])
+        labels_array = np.array([])
+    
+    print(f"\n✅ Featurization complete:")
+    print(f"   • Success: {total_successful:,}")
+    print(f"   • Failed: {total_failed:,}")
+    
+    return features_array, all_smiles, labels_array, total_successful, total_failed
+
+
+# ============================================================================
 
 
 def setup_environment():
@@ -64,42 +223,93 @@ def setup_environment():
     
     return train_dir, test_dir, log_content, start_time
 
-def featurize_dataset(loader, input_path, output_dir, dataset_name):
-    """Loads, featurizes, and saves a dataset with robust error handling."""
-    print(f"\nProcessing and saving {dataset_name} dataset to: {output_dir}")
+def featurize_dataset_parallel(input_path: str, output_dir: str, dataset_name: str) -> Tuple:
+    """
+    Loads, featurizes (with optional parallelism), and saves a dataset.
+    Uses settings.py configuration for parallel processing.
+    """
+    print(f"\n{'='*70}")
+    print(f"Processing {dataset_name.upper()} dataset")
+    print(f"{'='*70}")
+    
     if not os.path.exists(input_path):
-        print(f"\n ⚠️ ERROR: Input file '{input_path}' not found.")
-        return None, f" ⚠️ ERROR: Input file '{input_path}' not found.\n"
+        error_msg = f"⚠️ ERROR: Input file '{input_path}' not found.\n"
+        print(f"\n{error_msg}")
+        return None, error_msg
     
     try:
-        rdkit_logger = logging.getLogger('rdkit')
-        rdkit_logger.setLevel(logging.ERROR)
-        
-        dc_logger = logging.getLogger('deepchem')
-        dc_logger.setLevel(logging.ERROR)
-        
         from rdkit import RDLogger
         RDLogger.DisableLog('rdApp.*')
         
-        print(f"\nStarting featurization of {dataset_name}... (this may take a few minutes)")
-       
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            dataset = loader.create_dataset(input_path, data_dir=output_dir, shard_size=None)
-
-        if dataset is None or len(dataset) == 0:
-            error_msg = f" ⚠️ ERROR: Failed to featurize {dataset_name} dataset.\n"
+        # Load CSV
+        print(f"\n📂 Loading data from: {input_path}")
+        df = pd.read_csv(input_path)
+        print(f"   • Loaded {len(df):,} molecules")
+        
+        # Check if parallel processing should be used
+        use_parallel = (cfg.ENABLE_PARALLEL_PROCESSING and 
+                        len(df) >= cfg.PARALLEL_MIN_THRESHOLD)
+        
+        if use_parallel:
+            # PARALLEL FEATURIZATION
+            features, smiles_list, labels, successful, failed = featurize_parallel(
+                df, cfg.FP_SIZE, cfg.FP_RADIUS
+            )
+        else:
+            # SEQUENTIAL FEATURIZATION (fallback for small datasets)
+            print(f"\n📝 Using sequential featurization")
+            if not cfg.ENABLE_PARALLEL_PROCESSING:
+                print(f"   • Reason: Parallel processing disabled in settings.py")
+            else:
+                print(f"   • Reason: Dataset < {cfg.PARALLEL_MIN_THRESHOLD:,} molecules")
+            
+            featurizer = dc.feat.CircularFingerprint(size=cfg.FP_SIZE, radius=cfg.FP_RADIUS)
+            loader = dc.data.CSVLoader(
+                tasks=[cfg.LABEL_COL], 
+                feature_field=cfg.SMILES_COL, 
+                featurizer=featurizer
+            )
+            
+            print(f"\nFeaturizing {dataset_name}...")
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                dataset = loader.create_dataset(input_path, data_dir=output_dir, shard_size=None)
+            
+            if dataset is None or len(dataset) == 0:
+                error_msg = f"⚠️ ERROR: Failed to featurize {dataset_name} dataset.\n"
+                print(f"\n{error_msg}")
+                return None, error_msg
+            
+            print(f"\n✅ Successfully featurized {len(dataset)} molecules!")
+            log_update = f"{dataset_name.capitalize()}: {len(dataset)} molecules (sequential)\n"
+            return dataset, log_update
+        
+        # For parallel: Save as DiskDataset
+        if successful > 0:
+            print(f"\n💾 Saving dataset to: {output_dir}")
+            
+            # Create DiskDataset from parallel results
+            dataset = dc.data.DiskDataset.from_numpy(
+                X=features,
+                y=labels.reshape(-1, 1),
+                ids=smiles_list,
+                tasks=[cfg.LABEL_COL],
+                data_dir=output_dir
+            )
+            
+            print(f"✅ Dataset saved successfully!")
+            log_update = f"{dataset_name.capitalize()}: {successful} molecules (parallel), {failed} failed\n"
+            return dataset, log_update
+        else:
+            error_msg = f"⚠️ ERROR: No molecules could be featurized.\n"
             print(f"\n{error_msg}")
             return None, error_msg
-
-        print(f"\n -> ✅ Successfully featurized {len(dataset)} molecules from {dataset_name}!")
-        log_update = f"{dataset_name.capitalize()} dataset: {len(dataset)} molecules processed and saved to '{output_dir}'.\n"
-        
-        return dataset, log_update
         
     except Exception as e:
-        error_msg = f"\n ⚠️ ERROR during featurization of {dataset_name}: {str(e)}\n"
+        error_msg = f"⚠️ ERROR during featurization of {dataset_name}: {str(e)}\n"
         print(f"\n{error_msg}")
+        import traceback
+        traceback.print_exc()
         return None, error_msg
 
 def log_summary(log_content, train_dataset, test_dataset, duration):
@@ -132,32 +342,48 @@ def log_summary(log_content, train_dataset, test_dataset, duration):
     print(f"\nLog saved to: {log_file_path}")
 
 def main():
-    print("\n--- KAST | Step 2: Generating Fingerprints ---")
+    from utils import print_script_banner, setup_script_logging
+    logger = setup_script_logging("2_featurization")
+    
+    print_script_banner("K-talysticFlow | Step 2: Generating Fingerprints")
+    logger.info("Starting featurization process")
+    
+    # Display parallel configuration
+    print(f"\n⚙️  Configuration:")
+    print(f"   • Fingerprint size: {cfg.FP_SIZE}")
+    print(f"   • Fingerprint radius: {cfg.FP_RADIUS}")
+    print(f"   • Parallel enabled: {cfg.ENABLE_PARALLEL_PROCESSING}")
+    if cfg.ENABLE_PARALLEL_PROCESSING:
+        n_workers = get_optimal_workers()
+        print(f"   • Workers: {n_workers}")
+        print(f"   • Min threshold: {cfg.PARALLEL_MIN_THRESHOLD:,} molecules")
     
     train_dir, test_dir, log_content, start_time = setup_environment()
-    
-    featurizer = dc.feat.CircularFingerprint(size=cfg.FP_SIZE, radius=cfg.FP_RADIUS)
-    loader = dc.data.CSVLoader(
-        tasks=[cfg.LABEL_COL], feature_field=cfg.SMILES_COL, featurizer=featurizer
-    )
 
+    # Process training set
     train_csv_path = os.path.join(cfg.RESULTS_DIR, cfg.OUTPUT_TRAIN_CSV)
-    train_dataset, log_update = featurize_dataset(loader, train_csv_path, train_dir, "training")
+    train_dataset, log_update = featurize_dataset_parallel(train_csv_path, train_dir, "training")
     log_content += log_update
     if train_dataset is None:
+        logger.error("Failed to featurize training dataset")
         sys.exit(1)
 
+    # Process test set
     test_csv_path = os.path.join(cfg.RESULTS_DIR, cfg.OUTPUT_TEST_CSV)
-    test_dataset, log_update = featurize_dataset(loader, test_csv_path, test_dir, "test")
+    test_dataset, log_update = featurize_dataset_parallel(test_csv_path, test_dir, "test")
     log_content += log_update
     if test_dataset is None:
+        logger.error("Failed to featurize test dataset")
         sys.exit(1)
 
     duration = datetime.now() - start_time
     log_summary(log_content, train_dataset, test_dataset, duration)
+    logger.info("Featurization completed successfully")
 
-    print("\n✅ Fingerprints were generated successfully!")
-    print("\n➡️     Next step: '[3] Training the Model'.")
+    print("\n" + "="*70)
+    print("✅ Fingerprints were generated successfully!")
+    print("="*70)
+    print("\n➡️ Next step: '[3] Training the Model'.")
 
 if __name__ == '__main__':
     main()

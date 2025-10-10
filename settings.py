@@ -26,7 +26,8 @@ TRAIN_DATA_DIR = os.path.join(str(FEATURIZED_DATA_DIR), 'train')
 TEST_DATA_DIR = os.path.join(str(FEATURIZED_DATA_DIR), 'test')                
 
 MODEL_DIR = RESULTS_DIR / 'trained_model'
-PREDICTION_FEATURIZED_DIR = RESULTS_DIR / 'prediction_featurized'
+PREDICTION_FEATURIZED_BASE_DIR = RESULTS_DIR / 'prediction_featurized'  # Base directory for all prediction datasets
+PREDICTION_FEATURIZED_DIR = PREDICTION_FEATURIZED_BASE_DIR  # Default (will be updated dynamically)
 
 # --- 5. MODEL PARAMETERS ---
 MODEL_PARAMS = {
@@ -91,7 +92,7 @@ ENABLE_PARALLEL_PROCESSING = True
 #   N_WORKERS = None   # Auto: uses 7 cores on 8-core CPU
 #   N_WORKERS = 4      # Fixed: always uses 4 cores
 #   N_WORKERS = 1      # Sequential: no parallelism
-N_WORKERS = 6
+N_WORKERS = 10
 
 # Batch size for memory-efficient parallel processing
 # Larger values = faster but use more RAM

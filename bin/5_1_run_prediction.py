@@ -175,19 +175,105 @@ def generate_molecule_names(smiles_list, prefix="KAST"):
     return molecule_names
 
 
-def load_sparse_hdf5_data() -> Optional[Tuple[csr_matrix, list]]:
+def select_featurized_dataset() -> Optional[str]:
+    """
+    Allow user to select which featurized dataset to use for prediction.
+    Returns the selected dataset directory path or None if cancelled.
+    """
+    base_dir = cfg.PREDICTION_FEATURIZED_BASE_DIR
+    
+    if not os.path.exists(base_dir):
+        print(f"\n❌ ERROR: No featurized datasets found at: {base_dir}")
+        print("➡️ Run '[5] -> [1] Featurize for Prediction' first.")
+        return None
+    
+    # Find all directories with featurized_data.h5
+    available_datasets = []
+    for item in os.listdir(base_dir):
+        item_path = os.path.join(base_dir, item)
+        if os.path.isdir(item_path):
+            h5_file = os.path.join(item_path, 'featurized_data.h5')
+            if os.path.exists(h5_file):
+                # Get file size and molecule count
+                size_mb = os.path.getsize(h5_file) / (1024 * 1024)
+                try:
+                    with h5py.File(h5_file, 'r') as h5f:
+                        n_molecules = h5f.attrs.get('total_molecules', 0)
+                    available_datasets.append((item, size_mb, n_molecules))
+                except:
+                    available_datasets.append((item, size_mb, 0))
+    
+    if not available_datasets:
+        print(f"\n❌ ERROR: No featurized datasets found in: {base_dir}")
+        print("➡️ Run '[5] -> [1] Featurize for Prediction' first.")
+        return None
+    
+    print(f"📋 Available featurized datasets ({len(available_datasets)} found):")
+    print("-" * 70)
+    for i, (name, size_mb, n_mol) in enumerate(available_datasets, 1):
+        mol_str = f"{n_mol:,} mol" if n_mol > 0 else "unknown"
+        print(f"  {i:2}. {name:<35} ({size_mb:6.1f} MB, {mol_str})")
+    print("-" * 70)
+    print(f"  [0] Cancel and return to menu")
+    
+    invalid_attempts = 0
+    max_attempts = 3
+    
+    while True:
+        try:
+            choice = input(f"\nSelect dataset (1-{len(available_datasets)}): ").strip()
+            if not choice:
+                print("❌ Empty input. Enter a number.")
+                invalid_attempts += 1
+                if invalid_attempts >= max_attempts:
+                    print(f"\n⚠️ Too many invalid attempts. Returning to menu...")
+                    return None
+                continue
+            
+            choice_num = int(choice)
+            
+            if choice_num == 0:
+                print("\n⚠️ Operation cancelled by user.")
+                return None
+            
+            if 1 <= choice_num <= len(available_datasets):
+                selected_name = available_datasets[choice_num - 1][0]
+                selected_path = os.path.join(base_dir, selected_name)
+                print(f"\n✅ Selected dataset: {selected_name}")
+                return selected_path
+            else:
+                print(f"❌ Invalid number. Enter 0 to cancel or 1-{len(available_datasets)} to select.")
+                invalid_attempts += 1
+                if invalid_attempts >= max_attempts:
+                    print(f"\n⚠️ Too many invalid attempts. Returning to menu...")
+                    return None
+        except ValueError:
+            print("❌ Invalid input. Enter numbers only.")
+            invalid_attempts += 1
+            if invalid_attempts >= max_attempts:
+                print(f"\n⚠️ Too many invalid attempts. Returning to menu...")
+                return None
+        except KeyboardInterrupt:
+            print("\n\nOperation cancelled by user.")
+            return None
+
+
+def load_sparse_hdf5_data(dataset_dir: str = None) -> Optional[Tuple[csr_matrix, list]]:
     """Load sparse featurized data from HDF5 file."""
     from rdkit import RDLogger
     RDLogger.DisableLog('rdApp.*')
 
-    print("📦 Loading featurized dataset...")
+    print("\n📦 Loading featurized dataset...")
+    
+    # Use provided directory or default
+    data_dir = dataset_dir if dataset_dir else cfg.PREDICTION_FEATURIZED_DIR
 
-    if not os.path.exists(cfg.PREDICTION_FEATURIZED_DIR):
-        print(f"\nERROR: Directory '{cfg.PREDICTION_FEATURIZED_DIR}' not found.")
+    if not os.path.exists(data_dir):
+        print(f"\nERROR: Directory '{data_dir}' not found.")
         print("➡️ Run '[5] -> [1] Prepare database' first.")
         return None, None
     
-    hdf5_path = os.path.join(cfg.PREDICTION_FEATURIZED_DIR, 'featurized_data.h5')
+    hdf5_path = os.path.join(data_dir, 'featurized_data.h5')
     
     if not os.path.exists(hdf5_path):
         print(f"\nERROR: file not found at '{hdf5_path}'")
@@ -225,10 +311,10 @@ def load_sparse_hdf5_data() -> Optional[Tuple[csr_matrix, list]]:
         return None, None
 
 
-def load_data_and_model() -> Optional[Tuple]:
+def load_data_and_model(dataset_dir: str = None) -> Optional[Tuple]:
     """Load sparse data and trained model."""
-    # Load sparse features
-    features_sparse, smiles_list = load_sparse_hdf5_data()
+    # Load sparse features from selected dataset
+    features_sparse, smiles_list = load_sparse_hdf5_data(dataset_dir)
     if features_sparse is None:
         return None, None, None
     
@@ -290,14 +376,24 @@ def run_prediction(model: dc.models.Model, features_sparse: csr_matrix, smiles_l
                 batch_sparse = features_sparse[i:end_idx]
                 batches.append((i // batch_size, batch_sparse))
             
-            # Process batches in parallel with tqdm progress bar
+            # Process batches in parallel with tqdm progress bar (by total molecules)
             print(f"\n🚀 Processing {total_batches} batches with {n_workers} workers...")
+            print(f"   📊 Total molecules: {total_molecules:,}")
+            print()
             
             from tqdm import tqdm
-            results = Parallel(n_jobs=n_workers, verbose=0, backend='loky')(
-                delayed(predict_batch_worker)(batch, cfg.MODEL_DIR, cfg.MODEL_PARAMS)
-                for batch in tqdm(batches, desc="Predicting", unit="batch")
-            )
+            
+            pbar = tqdm(total=total_molecules, desc="Predicting", unit="mol", unit_scale=True)
+            
+            results = []
+            for batch in batches:
+                result = predict_batch_worker(batch, cfg.MODEL_DIR, cfg.MODEL_PARAMS)
+                results.append(result)
+                # Update progress bar with molecules in this batch
+                batch_size_actual = batch[1].shape[0]
+                pbar.update(batch_size_actual)
+            
+            pbar.close()
             
             # Sort results by batch index and concatenate
             results.sort(key=lambda x: x[0])
@@ -641,7 +737,13 @@ def main():
     print_script_banner("K-talysticFlow | Step 5.1: Running Predictions")
     logger.info("Starting prediction on new molecules")
     
-    loaded_assets = load_data_and_model()
+    # Let user select which featurized dataset to use
+    selected_dataset = select_featurized_dataset()
+    if selected_dataset is None:
+        logger.info("Operation cancelled by user")
+        sys.exit(0)
+    
+    loaded_assets = load_data_and_model(selected_dataset)
     if loaded_assets[0] is None:
         print("\n❌ Failed to load data or model.")
         logger.error("Failed to load data or model")

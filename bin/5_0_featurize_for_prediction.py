@@ -74,24 +74,34 @@ def featurize_smiles_chunk(smiles_chunk: List[str], fp_size: int, fp_radius: int
         Tuple of (features_list, valid_smiles, successful_count, failed_count)
     """
     try:
-        # Suppress ALL warnings in worker processes
+        # CRITICAL: Suppress ALL warnings/logs in worker processes
         import warnings
-        warnings.filterwarnings('ignore')
+        import logging
         import os
+        import sys
+        
+        warnings.filterwarnings('ignore')
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+        os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+        logging.getLogger().setLevel(logging.ERROR)
+        
+        # Redirect stderr to null to suppress DeepChem import warnings
+        stderr_backup = sys.stderr
+        sys.stderr = open(os.devnull, 'w')
         
         # Suppress RDKit warnings
         from rdkit import RDLogger
         RDLogger.DisableLog('rdApp.*')
         
-        # Suppress TensorFlow/DeepChem logging
-        import logging
-        logging.getLogger('tensorflow').setLevel(logging.ERROR)
-        logging.getLogger('deepchem').setLevel(logging.ERROR)
-        
-        # Each process needs its own featurizer instance
+        # Import DeepChem
         import deepchem as dc
         import numpy as np
+        
+        # Restore stderr after import
+        sys.stderr.close()
+        sys.stderr = stderr_backup
+        
+        # Each process needs its own featurizer instance
         featurizer = dc.feat.CircularFingerprint(size=fp_size, radius=fp_radius)
         
         features_list = []
@@ -274,35 +284,91 @@ def select_input_file() -> Optional[str]:
             print("\n\nOperation cancelled by user.")
             return None
 
-def clean_previous_featurized_data():
-    if not os.path.exists(cfg.PREDICTION_FEATURIZED_DIR):
-        return
-
-    print(f"\n\033[93m ⚠️ WARNING: Previous featurized data found at:\033[0m")
-    print(f"  {cfg.PREDICTION_FEATURIZED_DIR}")
+def get_custom_output_name(default_name: str) -> str:
+    """
+    Ask user for custom output folder name to allow multiple featurized datasets.
+    Returns the custom name or default if user presses Enter.
+    """
+    print(f"\n📝 Output Folder Naming")
+    print(f"   Default: {default_name}")
+    print(f"   You can specify a custom name to keep multiple featurized datasets.")
     
     invalid_attempts = 0
     max_attempts = 3
     
     while True:
-        choice = input("\nDo you want to overwrite with new featurization? (y/n): ").lower()
-        if choice in ['y', 'yes']:
-            print("Clearing...")
+        try:
+            custom_name = input(f"\nEnter custom folder name (or press Enter for default): ").strip()
+            
+            if not custom_name:
+                return default_name
+            
+            # Sanitize filename (remove invalid characters)
+            invalid_chars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*']
+            for char in invalid_chars:
+                custom_name = custom_name.replace(char, '_')
+            
+            if len(custom_name) > 50:
+                print("⚠️ Name too long. Please use less than 50 characters.")
+                invalid_attempts += 1
+                if invalid_attempts >= max_attempts:
+                    print(f"\n⚠️ Too many invalid attempts. Using default: {default_name}")
+                    return default_name
+                continue
+            
+            print(f"\n✅ Output folder will be: {custom_name}")
+            return custom_name
+            
+        except KeyboardInterrupt:
+            print(f"\n\n⚠️ Operation cancelled. Using default: {default_name}")
+            return default_name
+
+
+def check_and_handle_existing_data(output_dir: str) -> bool:
+    """
+    Check if featurized data already exists and ask user what to do.
+    Returns True to proceed, False to cancel.
+    """
+    if not os.path.exists(output_dir):
+        return True
+
+    print(f"\n\033[93m⚠️ WARNING: Featurized data already exists at:\033[0m")
+    print(f"  {output_dir}")
+    print(f"\nWhat do you want to do?")
+    print(f"  [1] Overwrite (delete existing data)")
+    print(f"  [2] Keep existing and use different name")
+    print(f"  [3] Cancel operation")
+    
+    invalid_attempts = 0
+    max_attempts = 3
+    
+    while True:
+        choice = input("\nSelect option (1-3): ").strip()
+        
+        if choice == '1':
+            print("🗑️ Removing existing data...")
             try:
-                shutil.rmtree(cfg.PREDICTION_FEATURIZED_DIR)
-                print("\n✅ Previous data removed")
+                shutil.rmtree(output_dir)
+                print("✅ Existing data removed")
+                return True
             except Exception as e:
-                print(f"\n⚠️ Warning: Error removing previous data: {e}")
-            break
-        elif choice in ['n', 'no']:
-            print("\nOperation cancelled.")
-            sys.exit(0)
+                print(f"\n⚠️ Error removing data: {e}")
+                return False
+                
+        elif choice == '2':
+            print("\n💡 Tip: You'll be asked for a different folder name")
+            return True
+            
+        elif choice == '3':
+            print("\n⚠️ Operation cancelled by user.")
+            return False
+            
         else:
-            print("Invalid option. Type 'y' or 'n'.")
+            print("❌ Invalid option. Select 1, 2, or 3.")
             invalid_attempts += 1
             if invalid_attempts >= max_attempts:
-                print(f"\n⚠️ Too many invalid attempts ({max_attempts}). Operation cancelled.")
-                sys.exit(0)
+                print(f"\n⚠️ Too many invalid attempts. Operation cancelled.")
+                return False
 
 def load_input_smiles(input_file_path: str) -> Optional[List[str]]:
     """Loads SMILES molecules from the specified input file."""
@@ -442,19 +508,23 @@ def featurize_and_save_to_disk(smiles_list: List[str]) -> Tuple[bool, dict]:
             print(f"\n📊 Processing {len(smiles_list):,} molecules in {n_batches} batches...")
             print(f"  • Batch size: {batch_size:,} molecules")
             print(f"  • Workers per batch: {n_workers}")
+            print()
+            
+            # Process batches with tqdm progress bar (by total molecules)
+            from tqdm import tqdm
+            
+            pbar = tqdm(total=len(smiles_list), desc="Featurizing", unit="mol", unit_scale=True)
             
             for batch_idx in range(n_batches):
                 start_idx = batch_idx * batch_size
                 end_idx = min(start_idx + batch_size, len(smiles_list))
                 batch_smiles = smiles_list[start_idx:end_idx]
                 
-                print(f"\n🔄 Batch {batch_idx+1}/{n_batches}: Processing {len(batch_smiles):,} molecules ({start_idx:,} to {end_idx:,})...")
-                
                 # Split batch into chunks for parallel processing
                 smiles_chunks = split_into_chunks(batch_smiles, n_workers)
                 
-                # Process batch in parallel
-                results = Parallel(n_jobs=n_workers, verbose=5, backend='loky')(
+                # Process batch in parallel (verbose=0 to not clutter output)
+                results = Parallel(n_jobs=n_workers, verbose=0, backend='loky')(
                     delayed(featurize_smiles_chunk)(chunk, cfg.FP_SIZE, cfg.FP_RADIUS)
                     for chunk in smiles_chunks
                 )
@@ -466,12 +536,14 @@ def featurize_and_save_to_disk(smiles_list: List[str]) -> Tuple[bool, dict]:
                     stats['successful'] += successful
                     stats['failed'] += failed
                 
-                print(f"✅ Batch {batch_idx+1} complete: {stats['successful']:,} success, {stats['failed']:,} failed")
+                # Update progress bar with molecules processed in this batch
+                pbar.update(len(batch_smiles))
                 
                 # Free memory after each batch
                 del results
                 gc.collect()
             
+            pbar.close()
             print(f"\n✅ All done!")
             print(f"   Total processed: {stats['successful'] + stats['failed']:,}")
             print(f"   Successful: {stats['successful']:,}")
@@ -717,15 +789,39 @@ def main():
     print_script_banner("K-talysticFlow | Step 5.0: Featurization for Prediction")
     logger.info("Starting featurization for prediction")
     
-    clean_previous_featurized_data()
-    
+    # Select input file
     input_file_path = select_input_file()
     if input_file_path is None:
         logger.info("Operation cancelled by user")
         sys.exit(0)  # Exit gracefully without error
     
+    # Get custom output folder name (allows multiple datasets)
+    input_filename = os.path.splitext(os.path.basename(input_file_path))[0]
+    default_folder_name = input_filename  # Just the filename, no prefix
+    
+    # Create base directory if doesn't exist
+    ensure_dir_exists(cfg.PREDICTION_FEATURIZED_BASE_DIR)
+    
+    # Check if default exists and handle
+    default_full_path = os.path.join(cfg.PREDICTION_FEATURIZED_BASE_DIR, default_folder_name)
+    if not check_and_handle_existing_data(default_full_path):
+        logger.info("Operation cancelled by user")
+        sys.exit(0)
+    
+    # Ask for custom name
+    custom_folder_name = get_custom_output_name(default_folder_name)
+    custom_output_dir = os.path.join(cfg.PREDICTION_FEATURIZED_BASE_DIR, custom_folder_name)
+    
+    # Update config to use custom directory
+    original_dir = cfg.PREDICTION_FEATURIZED_DIR
+    cfg.PREDICTION_FEATURIZED_DIR = custom_output_dir
+    
+    print(f"\n📂 Output directory: {cfg.PREDICTION_FEATURIZED_DIR}")
+    
+    # Load SMILES
     smiles_list = load_input_smiles(input_file_path)
     if smiles_list is None:
+        cfg.PREDICTION_FEATURIZED_DIR = original_dir  # Restore
         logger.error("Failed to load SMILES from input file")
         sys.exit(1)
     

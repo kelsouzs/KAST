@@ -64,6 +64,54 @@ LABEL_COL = 'active'
 OUTPUT_PREDICTIONS_CSV = '5_1_new_molecule_predictions.csv'
 
 # --- 11. EXTRA CONFIGURATIONS (FOR COMPATIBILITY) ---
-N_JOBS = -1         
-VERBOSE = True      
-DEBUG = False    
+N_JOBS = -1          # ✅ For parallelization
+VERBOSE = True       # ✅ For verbose logs
+DEBUG = False        # ✅ For debugging
+
+# --- 12. PARALLEL PROCESSING CONFIGURATIONS ---
+# ============================================================================
+# Global configurations for parallel processing across ALL scripts
+# These settings control how the pipeline uses multiprocessing to speed up
+# computation-intensive tasks like featurization, prediction, and analysis.
+# ============================================================================
+
+# Enable/disable parallel processing globally for ALL scripts
+# Set to False if you experience issues or want sequential processing
+ENABLE_PARALLEL_PROCESSING = True
+
+# Number of CPU cores to use (applies to ALL parallelized scripts)
+# Options:
+#   None  = auto-detect optimal (cpu_count - 1) ✅ RECOMMENDED
+#           This leaves one core free for system operations
+#   -1    = use ALL available cores (may slow down system responsiveness)
+#   1     = disable parallelism completely (sequential processing only)
+#   N     = use exactly N cores (e.g., 2, 4, 8, 16)
+#
+# Examples:
+#   N_WORKERS = None   # Auto: uses 7 cores on 8-core CPU
+#   N_WORKERS = 4      # Fixed: always uses 4 cores
+#   N_WORKERS = 1      # Sequential: no parallelism
+N_WORKERS = 6
+
+# Batch size for memory-efficient parallel processing
+# Larger values = faster but use more RAM
+# Smaller values = slower but safer for limited RAM
+# Recommended: 100000 for systems with 16GB+ RAM
+#              50000 for systems with 8GB RAM
+#              25000 for systems with 4GB RAM
+PARALLEL_BATCH_SIZE = 100000  # molecules per batch
+
+# Minimum dataset size to trigger parallel processing
+# Below this threshold, sequential processing is actually faster
+# due to multiprocessing overhead (process spawning, data serialization)
+# Recommended: Keep at 10000 unless you have specific reasons to change
+PARALLEL_MIN_THRESHOLD = 10000  # molecules
+
+# ============================================================================
+# Scripts that use these configurations:
+#   - 2_featurization.py        (train/test featurization)
+#   - 5_0_featurize_for_prediction.py  (prediction featurization)
+#   - 5_1_run_prediction.py     (batch predictions)
+#   - 4_1_cross_validation.py   (k-fold CV)
+#   - 4_3_tanimoto_similarity.py (similarity calculations)
+# ============================================================================

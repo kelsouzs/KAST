@@ -1,8 +1,22 @@
+# Deep Learning Framework
 tensorflow
 torch
 deepchem
+
+# Data Processing
 pandas
 numpy
 scikit-learn
+
+# Visualization
 matplotlib
+
+# Progress Bars
 tqdm
+
+# Model Serialization
+joblib
+
+# Chemistry (requires conda - see installation instructions below)
+# RDKit cannot be installed via pip. Use: conda install -c conda-forge rdkit
+# rdkit

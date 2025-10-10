@@ -4,6 +4,7 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Status](https://img.shields.io/badge/Status-In%20Development-orange.svg)
 ![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.999999999.svg)
+[![Documentation](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://lmm.uefs.br/wp-content/uploads/2025/10/KAST-Documentation.html)
 [![LinkedIn](https://img.shields.io/badge/-LinkedIn-blue?style=flat-square&logo=linkedin&logoColor=white&link=https://www.linkedin.com/in/kelsouzs)](https://www.linkedin.com/in/kelsouzs)
 [![GitHub](https://img.shields.io/badge/-GitHub-181717?style=flat-square&logo=github&logoColor=white&link=https://github.com/kelsouzs)](https://github.com/kelsouzs)
 
@@ -118,6 +119,12 @@ PARALLEL_MIN_THRESHOLD = 10000       # Min dataset size for parallelism
 | Other scripts | Sequential | N/A |
 
 **Note:** Parallel processing automatically activates only when dataset size exceeds `PARALLEL_MIN_THRESHOLD` (default: 10,000 molecules).
+
+---
+
+## 📖 Documentation
+
+**[📘 Complete Documentation](https://lmm.uefs.br/wp-content/uploads/2025/10/KAST-Documentation.html)** — Full user guide with detailed explanations, examples, and troubleshooting.
 
 ---
 
@@ -399,3 +406,4 @@ Open an [issue](https://github.com/kelsouzs/KAST/issues) or email [lmm@uefs.br](
 
 
 ---
+

@@ -92,7 +92,7 @@ ENABLE_PARALLEL_PROCESSING = True
 #   N_WORKERS = None   # Auto: uses 7 cores on 8-core CPU
 #   N_WORKERS = 4      # Fixed: always uses 4 cores
 #   N_WORKERS = 1      # Sequential: no parallelism
-N_WORKERS = 10
+N_WORKERS = 8
 
 # Batch size for memory-efficient parallel processing
 # Larger values = faster but use more RAM

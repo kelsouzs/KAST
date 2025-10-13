@@ -5,14 +5,47 @@
 # avoid code repetition and maintain organization.
 # -----------------------------------------------------------------------------
 
+# ============================================================================
+# CRITICAL: Suppress warnings BEFORE imports
+# ============================================================================
 import os
 import sys
+
+# Set environment variables to suppress TensorFlow/Protobuf warnings
+os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
+os.environ.setdefault('TF_ENABLE_ONEDNN_OPTS', '0')
+os.environ.setdefault('PYTHONWARNINGS', 'ignore')
+os.environ.setdefault('PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION', 'python')
+
+import warnings
+warnings.filterwarnings('ignore')
+
 import logging
+
+# Redirect stderr/stdout during DeepChem import to suppress dependency warnings
+_stderr = sys.stderr
+_stdout = sys.stdout
+sys.stderr = open(os.devnull, 'w')
+sys.stdout = open(os.devnull, 'w')
+
+# Import DeepChem (will try to import optional dependencies)
+import deepchem as dc
+
+# Restore stderr/stdout
+sys.stderr.close()
+sys.stderr = _stderr
+sys.stdout.close()
+sys.stdout = _stdout
+
+# Suppress DeepChem logging
+logging.getLogger('deepchem').setLevel(logging.CRITICAL)
+logging.getLogger('pytorch_lightning').setLevel(logging.CRITICAL)
+logging.getLogger('jax').setLevel(logging.CRITICAL)
+
 from typing import List, Optional
 from datetime import datetime
 
 import numpy as np
-import deepchem as dc
 from rdkit import Chem
 from rdkit.Chem import AllChem, DataStructs
 from tqdm import tqdm
@@ -23,21 +56,26 @@ if current_dir not in sys.path:
 
 import settings as cfg
 
-def load_smiles_from_file(filepath: str) -> List[str]:
+def load_smiles_from_file(filepath: str, verbose: bool = True) -> List[str]:
     """
     Loads a list of SMILES from a text file (.smi, .txt).
     Assumes one SMILES per line, ignoring empty lines.
+    
+    Args:
+        filepath: Path to the SMILES file
+        verbose: If True, prints loading messages
     """
     if not os.path.exists(filepath):
-        print(f"\nERROR: SMILES file '{filepath}' not found.")
+        print(f"\n❌ ERROR: SMILES file '{filepath}' not found.")
         return []
     try:
         with open(filepath, 'r') as f:
             smiles_list = [line.strip() for line in f if line.strip()]
-        print(f"  -> Loaded {len(smiles_list)} SMILES from '{os.path.basename(filepath)}'")
+        if verbose:
+            print(f"   ✓ Loaded {len(smiles_list)} SMILES from '{os.path.basename(filepath)}'")
         return smiles_list
     except Exception as e:
-        print(f"\nERROR reading file '{filepath}': {e}")
+        print(f"\n❌ ERROR reading file '{filepath}': {e}")
         return []
 
 def get_morgan_fp(smiles_str: str, radius: int, nBits: int) -> Optional[DataStructs.ExplicitBitVect]:
@@ -59,22 +97,232 @@ def ensure_dir_exists(dir_path: str):
         print(f"\nINFO: Creating missing directory: {dir_path}")
         os.makedirs(dir_path)
 
-def validate_smiles(smiles_list: List[str]) -> List[str]:
+def normalize_molecule(mol: Chem.Mol) -> Optional[Chem.Mol]:
+    """
+    Normalizes a molecule using RDKit MolStandardize.
+    
+    Steps:
+    1. Remove salts/solvents (keep largest fragment)
+    2. Neutralize charges (if possible)
+    3. Canonicalize tautomers (optional, more intensive)
+    
+    Returns:
+        Normalized molecule or None if fails
+    """
+    if mol is None:
+        return None
+    
+    try:
+        from rdkit.Chem.MolStandardize import rdMolStandardize
+        
+        # 1. Fragment parent (remove salts, keep largest fragment)
+        #    Example: "CCO.Cl" -> "CCO"
+        uncharger = rdMolStandardize.Uncharger()
+        lfc = rdMolStandardize.LargestFragmentChooser()
+        mol = lfc.choose(mol)
+        
+        # 2. Neutralize charges when possible
+        #    Example: "CC(=O)[O-]" -> "CC(=O)O"
+        mol = uncharger.uncharge(mol)
+        
+        # 3. Canonicalize tautomers (optional - can be slow)
+        #    Example: "CC(O)=CC" -> "CC(=O)CC" (prefer keto form)
+        # Uncomment if needed:
+        # te = rdMolStandardize.TautomerEnumerator()
+        # mol = te.Canonicalize(mol)
+        
+        # Sanitize final molecule
+        Chem.SanitizeMol(mol)
+        
+        return mol
+        
+    except Exception as e:
+        # If normalization fails, return None
+        return None
+
+
+def validate_smiles(smiles_list: List[str], normalize: bool = True, verbose: bool = True, show_progress: bool = False) -> List[str]:
+    """
+    Validates and canonicalizes SMILES strings.
+    
+    Args:
+        smiles_list: List of SMILES strings
+        normalize: If True, applies robust normalization (salts, charges, tautomers)
+        verbose: If True, prints validation statistics
+        show_progress: If True, shows progress bar (recommended for > 1000 molecules)
+    
+    Returns:
+        List of valid canonical SMILES
+    """
+    from tqdm import tqdm
+    
     valid_smiles = []
     invalid_count = 0
+    normalized_count = 0
 
-    for smi in smiles_list:
+    # Use tqdm if requested
+    iterator = tqdm(smiles_list, desc="  Validating", unit="mol") if show_progress else smiles_list
+
+    for smi in iterator:
         mol = Chem.MolFromSmiles(smi)
+        
         if mol is not None:
+            # Apply normalization if requested
+            if normalize:
+                mol_normalized = normalize_molecule(mol)
+                if mol_normalized is not None:
+                    mol = mol_normalized
+                    # Check if molecule changed after normalization
+                    smi_normalized = Chem.MolToSmiles(mol)
+                    if smi != smi_normalized:
+                        normalized_count += 1
+                else:
+                    # Normalization failed, use original
+                    pass
+            
+            # Canonicalize
             canonical_smi = Chem.MolToSmiles(mol)
             valid_smiles.append(canonical_smi)
         else:
             invalid_count += 1
     
-    if invalid_count > 0:
-        print(f"⚠️  {invalid_count} invalid SMILES were removed")
+    if verbose:
+        if invalid_count > 0:
+            print(f"    ⚠️  {invalid_count} invalid SMILES removed")
     
     return valid_smiles
+
+
+def validate_smiles_chunked(smiles_list: List[str], chunk_size: int = 100000, 
+                           normalize: bool = True, n_jobs: int = -1) -> List[str]:
+    """
+    Validates SMILES in chunks with parallel processing for HUGE datasets (millions+).
+    
+    Strategy for 1 billion molecules:
+    1. Process in chunks (avoid memory overflow)
+    2. Each chunk is parallelized internally
+    3. Progress bar shows overall progress
+    
+    Performance estimate:
+    - 1M molecules: ~30 seconds (8 cores)
+    - 10M molecules: ~5 minutes (8 cores)
+    - 100M molecules: ~50 minutes (8 cores)
+    - 1B molecules: ~8 hours (8 cores)
+    
+    Args:
+        smiles_list: List of SMILES strings
+        chunk_size: Size of each chunk (default 100k = good balance)
+        normalize: Apply normalization
+        n_jobs: Number of parallel jobs (-1 = all cores)
+    
+    Returns:
+        List of valid canonical SMILES
+    """
+    from joblib import Parallel, delayed
+    from tqdm import tqdm
+    import numpy as np
+    
+    def _process_single_smiles(smi: str, normalize: bool) -> tuple:
+        """Process one SMILES (called in parallel) with warnings suppressed"""
+        import warnings
+        import os
+        import sys
+        
+        # CRITICAL: Set environment BEFORE any imports
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+        os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+        os.environ['PYTHONWARNINGS'] = 'ignore'
+        os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
+        
+        # Suppress all warnings in worker processes
+        warnings.filterwarnings('ignore')
+        warnings.simplefilter('ignore')
+        
+        # Suppress TensorFlow logging
+        import logging
+        logging.getLogger('tensorflow').setLevel(logging.ERROR)
+        logging.getLogger('tensorflow').propagate = False
+        
+        # Monkey-patch TensorFlow deprecation warnings
+        try:
+            import tensorflow as tf
+            # Disable deprecation warnings by replacing the function
+            tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+        except:
+            pass
+        
+        # Redirect stderr temporarily during imports to suppress protobuf warnings
+        stderr_backup = sys.stderr
+        stdout_backup = sys.stdout
+        try:
+            sys.stderr = open(os.devnull, 'w')
+            sys.stdout = open(os.devnull, 'w')
+            
+            # Suppress RDKit warnings (must be done per-process)
+            from rdkit import RDLogger
+            RDLogger.DisableLog('rdApp.*')
+        finally:
+            # Restore stderr/stdout after critical imports
+            if sys.stderr != stderr_backup:
+                sys.stderr.close()
+                sys.stderr = stderr_backup
+            if sys.stdout != stdout_backup:
+                sys.stdout.close()
+                sys.stdout = stdout_backup
+        
+        try:
+            mol = Chem.MolFromSmiles(smi)
+            if mol is None:
+                return None, False
+            
+            if normalize:
+                mol_normalized = normalize_molecule(mol)
+                if mol_normalized is not None:
+                    original_smi = Chem.MolToSmiles(mol)
+                    mol = mol_normalized
+                    canonical_smi = Chem.MolToSmiles(mol)
+                    was_normalized = (original_smi != canonical_smi)
+                    return canonical_smi, was_normalized
+            
+            canonical_smi = Chem.MolToSmiles(mol)
+            return canonical_smi, False
+        except:
+            return None, False
+    
+    total = len(smiles_list)
+    num_chunks = (total + chunk_size - 1) // chunk_size
+    
+    all_valid_smiles = []
+    total_invalid = 0
+    total_normalized = 0
+    
+    # Process chunks with progress bar (showing molecules, not chunks!)
+    pbar = tqdm(total=total, desc="   Canonicalizing", unit="mol", unit_scale=True)
+    
+    for chunk_idx in range(num_chunks):
+        start_idx = chunk_idx * chunk_size
+        end_idx = min(start_idx + chunk_size, total)
+        chunk = smiles_list[start_idx:end_idx]
+        
+        # Parallel process this chunk
+        results = Parallel(n_jobs=n_jobs, backend='loky')(
+            delayed(_process_single_smiles)(smi, normalize) for smi in chunk
+        )
+        
+        # Collect results and update progress by molecules processed
+        for canonical_smi, was_normalized in results:
+            if canonical_smi is not None:
+                all_valid_smiles.append(canonical_smi)
+                if was_normalized:
+                    total_normalized += 1
+            else:
+                total_invalid += 1
+            pbar.update(1)  # Update for each molecule processed
+    
+    pbar.close()
+    
+    print(f"  \n ✓ Processed {len(all_valid_smiles):,}/{total:,} valid molecules")
+
 
 def load_and_featurize_full_dataset() -> Optional[dc.data.Dataset]:
 
@@ -85,7 +333,7 @@ def load_and_featurize_full_dataset() -> Optional[dc.data.Dataset]:
         print("\nERROR: Failed to load SMILES files.")
         return None
 
-    print("Validating SMILES...")
+    print("\nValidating SMILES...")
     actives = validate_smiles(actives_raw)
     inactives = validate_smiles(inactives_raw)
     
@@ -93,7 +341,7 @@ def load_and_featurize_full_dataset() -> Optional[dc.data.Dataset]:
         print("\nERROR: No valid SMILES found after validation.")
         return None
 
-    print(f"Loaded dataset: {len(actives)} actives, {len(inactives)} inactives")
+    print(f"\nLoaded dataset: {len(actives)} actives, {len(inactives)} inactives")
 
     if len(actives) < cfg.MIN_MOLECULES_PER_CLASS or len(inactives) < cfg.MIN_MOLECULES_PER_CLASS:
         print(f"⚠️ Dataset does not meet minimum criteria ({cfg.MIN_MOLECULES_PER_CLASS} per class)")

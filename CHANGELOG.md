@@ -37,7 +37,7 @@ K-talysticFlow's first stable release! A complete deep learning pipeline for mol
   - Sparse matrix optimization
   - Batch processing for memory efficiency
 
-- **Model Training** (`3_training.py`)
+- **Model Creation and Training** (`3_create_training.py`)
   - DeepChem MultitaskClassifier (neural network)
   - TensorFlow backend
   - Automatic checkpoint saving

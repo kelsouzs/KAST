@@ -151,30 +151,6 @@ def display_splash_screen():
     version_text = f"Version {__version__} | Developed by: {__author__}"
     print(f"\033[90m{version_text.center(MENU_WIDTH)}\033[0m")
 
-def check_data_files():
-    """
-    Validates that required input data files exist before processing.
-    
-    Checks for:
-        - Active molecules SMILES file (cfg.ACTIVE_SMILES_FILE)
-        - Inactive molecules SMILES file (cfg.INACTIVE_SMILES_FILE)
-    
-    Returns:
-        bool: True if all files exist, False if any are missing
-    
-    Side Effects:
-        Prints warning message listing any missing files
-    """
-    required_files = [cfg.ACTIVE_SMILES_FILE, cfg.INACTIVE_SMILES_FILE]
-    missing_files = [f for f in required_files if not os.path.exists(f)]
-    
-    if missing_files:
-        print(f"\n⚠️ WARNING: Required files not found:")
-        for f in missing_files:
-            print(f"   - {f}")
-        return False
-    return True
-
 def show_credits():
     """
     Displays project information, credits, and citation details.
@@ -263,9 +239,6 @@ def step_1_preparation():
     Returns:
         bool: True if preparation completed successfully, False otherwise
     """
-    if not check_data_files():
-        input("\nFix missing files and try again. Press Enter...")
-        return False
     print("\n🔄 Running preparation...")
     result = run_script("1_preparation.py")
     return result
@@ -288,19 +261,18 @@ def step_2_featurization():
 
 def step_3_training(): 
     """
-    Executes Step 3: Model Training.
+    Executes Step 3: Model Creation and Training.
     
-    Runs 3_training.py which handles:
-        - Neural network training
+    Runs 3_create_training.py which handles:
+        - Neural network creation
+        - Model training with configured parameters
         - Model checkpoint saving
-        - Training metrics logging
     
     Returns:
         bool: True if training completed successfully, False otherwise
     """
-    print("\n🔄 Running training...")
-    result = run_script("3_training.py")
-    return result
+    print("\n🔄 Creating and training model...")
+    result = run_script("3_create_training.py")
 
 def step_4_evaluation_menu():
     """Displays evaluation submenu allowing single or all evaluations"""
@@ -317,7 +289,7 @@ def step_4_evaluation_menu():
         os.system('cls' if os.name == 'nt' else 'clear')
 
         if sub_choice == '1':
-            print_menu_header("Running all evaluations in sequence")
+            # Run all evaluations (each script will show its own header)
             for script in EVALUATION_SCRIPTS:
                 if not run_script(script):
                     print(f"\n\033[91mEVALUATION INTERRUPTED DUE TO ERROR IN SCRIPT: '{script}'\033[0m")
@@ -327,12 +299,14 @@ def step_4_evaluation_menu():
         elif sub_choice == '2':
             while True:
                 os.system('cls' if os.name == 'nt' else 'clear')
-                print("--- Choose the evaluation to run ---")
+                print(SEPARATOR)
+                print("EVALUATION TESTS - Select an Option".center(MENU_WIDTH))
+                print(SEPARATOR)
                 for i, friendly_name in enumerate(EVALUATION_SCRIPTS_NAMES, 1):
                     print(f"  [{i}] {friendly_name}")
-                print("\n  [0] Return to Previous Submenu")
+                print(f"\n  [0] Return to Previous Menu")
                 print(SEPARATOR)
-                script_choice_str = input("Enter the test number: ")
+                script_choice_str = input("Enter your choice: ")
                 
                 # Clear screen immediately after choice
                 os.system('cls' if os.name == 'nt' else 'clear')
@@ -372,7 +346,7 @@ def step_5_prediction_menu():
             print("\n🔄 Running featurization...")
             result = run_script("5_0_featurize_for_prediction.py")
             if result:
-                print("✅ Step completed!")
+                print("\n✅ Step completed!")
             else:
                 print("❌ Featurization error.")
             input("\nPress Enter to continue...")
@@ -381,7 +355,7 @@ def step_5_prediction_menu():
             print("\n🔄 Running prediction...")
             result = run_script("5_1_run_prediction.py")
             if result:
-                print("✅ Step completed!")
+                print("\n✅ Step completed!")
             else:
                 print("❌ Prediction error.")
             input("\nPress Enter to continue...")
@@ -392,10 +366,10 @@ def step_5_prediction_menu():
             if not result1:
                 print("❌ Featurization error. Aborting flow.")
             else:
-                print("✅ Step completed!")
+                print("\n✅ Step completed!")
                 result2 = run_script("5_1_run_prediction.py")
                 if result2:
-                    print("✅ Full flow completed successfully!")
+                    print("\n✅ Full flow completed successfully!")
                 else:
                     print("❌ Prediction error.")
             input("\nPress Enter to continue...")

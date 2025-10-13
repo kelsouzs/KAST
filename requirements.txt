@@ -2,6 +2,8 @@
 tensorflow
 torch
 deepchem
+pytorch-lightning  # Training framework for PyTorch (suppresses DeepChem warnings)
+jax  # Google's JAX for GPU/TPU acceleration (suppresses DeepChem warnings)
 
 # Data Processing
 pandas

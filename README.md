@@ -49,7 +49,7 @@ KAST/
 ├── 🧩 bin/                # Pipeline scripts
 │   ├── ⚙️ 1_preparation.py           # Data split
 │   ├── 🦾 2_featurization.py         # Fingerprinting
-│   ├── 🤖 3_training.py              # Model training
+│   ├── 🤖 3_create_training.py       # Model creation and training
 │   ├── 📊 4_0_evaluation_main.py     # Main evaluation
 │   ├── 🧪 ... (other evaluation scripts)
 │   └── 🔮 5_1_run_prediction.py      # Prediction for new molecules
@@ -122,19 +122,19 @@ PARALLEL_MIN_THRESHOLD = 10000       # Min dataset size for parallelism
 
 ---
 
-## 📖 Documentation
+## � Documentation
 
 **[📘 Complete Documentation](https://lmm.uefs.br/wp-content/uploads/2025/10/KAST-Documentation.html)** — Full user guide with detailed explanations, examples, and troubleshooting.
 
 ---
 
-## 🚀 Quick Start
+## �🚀 Quick Start
 
 | Task                | Command                        |
 |---------------------|-------------------------------|
 | Prepare data        | `python bin/1_preparation.py`  |
 | Featurize           | `python bin/2_featurization.py`|
-| Train model         | `python bin/3_training.py`     |
+| Train model         | `python bin/3_create_training.py` |
 | Main evaluation     | `python bin/4_0_evaluation_main.py` |
 | Predict new         | `python bin/5_1_run_prediction.py`|
 
@@ -183,7 +183,7 @@ Access testing and configuration tools via **option [8]** in the main menu:
 python main.py
 
 # Then follow this sequence:
-# [1] Prepare and Split Data → Creates train/test sets
+# [1] Prepare and Split Data → Creates train/test sets (you'll choose the split ratio)
 # [2] Generate Fingerprints → Featurizes molecules
 # [3] Train the Model → Creates neural network
 # [4] → [1] Run ALL evaluations → Comprehensive analysis
@@ -199,8 +199,8 @@ python bin/1_preparation.py
 # Generate fingerprints (with parallel processing)
 python bin/2_featurization.py
 
-# Train model
-python bin/3_training.py
+# Create and train model
+python bin/3_create_training.py
 
 # Evaluate with cross-validation only
 python bin/4_1_cross_validation.py
@@ -402,9 +402,6 @@ Pull requests welcome! For major changes, open an issue first to discuss.
 ## 📬 Contact
 
 Questions or suggestions?  
-Open an [issue](https://github.com/kelsouzs/KAST/issues) or email [lmm@uefs.br](mailto:lmm@uefs.br)
-
+Open an [issue](https://github.com/kelsouzs/KAST/issues) or email [kelsouzs.uefs@gmail.com](mailto:kelsouzs.uefs@gmail.com)
 
 ---
-
-

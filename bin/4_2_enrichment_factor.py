@@ -45,7 +45,7 @@ def load_predictions(file_path: str) -> Optional[Tuple[np.ndarray, np.ndarray]]:
     from rdkit import RDLogger
     RDLogger.DisableLog('rdApp.*')
     
-    print(f"\nLoading predictions from: {file_path}")
+    print(f"Loading predictions from: {file_path}")
     
     if not os.path.exists(file_path):
         print(f"\nERROR: Predictions file '{os.path.basename(file_path)}' not found.")

@@ -16,26 +16,56 @@ NEXT STEP:
 - Run step 5.1 to perform predictions
 """
 
+# ============================================================================
+# CRITICAL: Suppress ALL warnings BEFORE any imports
+# This must be THE FIRST code executed to catch Protobuf/TensorFlow warnings
+# ============================================================================
 import os
+import sys
+
+# Set environment variables BEFORE importing anything
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow C++ warnings
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # Disable oneDNN warnings
+os.environ['PYTHONWARNINGS'] = 'ignore'     # Suppress Python warnings
+os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'  # Use pure Python protobuf
+
+# Redirect stderr AND stdout to devnull to catch early import warnings
+_stderr = sys.stderr
+_stdout = sys.stdout
+sys.stderr = open(os.devnull, 'w')
+sys.stdout = open(os.devnull, 'w')
+
 import warnings
 import logging
+
+# Configure warnings and logging
+warnings.filterwarnings('ignore')
+warnings.simplefilter('ignore')
+logging.getLogger().setLevel(logging.CRITICAL)
+
+# Import TensorFlow and DeepChem silently (suppress lightning/jax warnings)
+import tensorflow as tf
+import deepchem as dc
+
+# Restore stderr/stdout after imports
+sys.stderr.close()
+sys.stderr = _stderr
+sys.stdout.close()
+sys.stdout = _stdout
+
+# Now configure logging
+tf.get_logger().setLevel('ERROR')
+logging.getLogger('deepchem').setLevel(logging.CRITICAL)
+logging.getLogger('pytorch_lightning').setLevel(logging.CRITICAL)
+logging.getLogger('jax').setLevel(logging.CRITICAL)
+
+# Now safe to import other modules
 from typing import List, Tuple, Optional
 import gc
 import shutil
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-warnings.filterwarnings('ignore', category=UserWarning)
-warnings.filterwarnings('ignore', category=FutureWarning)
-warnings.filterwarnings('ignore', category=DeprecationWarning)
-
-import tensorflow as tf
-tf.get_logger().setLevel('ERROR')
-logging.getLogger('deepchem').setLevel('ERROR')
-
 import sys
 import numpy as np
-import deepchem as dc
 import pandas as pd
 from tqdm import tqdm
 from datetime import datetime
@@ -53,7 +83,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import settings as cfg
-from utils import ensure_dir_exists, load_smiles_from_file
+from utils import ensure_dir_exists, load_smiles_from_file, validate_smiles, validate_smiles_chunked
 from deepchem.data import DiskDataset  
 
 # ============================================================================
@@ -80,29 +110,47 @@ def featurize_smiles_chunk(smiles_chunk: List[str], fp_size: int, fp_radius: int
         import os
         import sys
         
-        warnings.filterwarnings('ignore')
+        # Set environment BEFORE any imports
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
         os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-        logging.getLogger().setLevel(logging.ERROR)
+        os.environ['PYTHONWARNINGS'] = 'ignore'
+        os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
         
-        # Redirect stderr to null to suppress DeepChem import warnings
+        # Suppress warnings
+        warnings.filterwarnings('ignore')
+        warnings.simplefilter('ignore')
+        
+        # CRITICAL: Disable ALL logging at WARNING level
+        logging.getLogger().setLevel(logging.CRITICAL)
+        logging.getLogger('tensorflow').setLevel(logging.CRITICAL)
+        logging.getLogger('tensorflow.python').setLevel(logging.CRITICAL)
+        logging.getLogger('tensorflow.python.util.deprecation').setLevel(logging.CRITICAL)
+        
+        # Redirect stderr to null to suppress Protobuf/TF import warnings
         stderr_backup = sys.stderr
-        sys.stderr = open(os.devnull, 'w')
-        
-        # Suppress RDKit warnings
-        from rdkit import RDLogger
-        RDLogger.DisableLog('rdApp.*')
-        
-        # Import DeepChem
-        import deepchem as dc
-        import numpy as np
-        
-        # Restore stderr after import
-        sys.stderr.close()
-        sys.stderr = stderr_backup
-        
-        # Each process needs its own featurizer instance
-        featurizer = dc.feat.CircularFingerprint(size=fp_size, radius=fp_radius)
+        stdout_backup = sys.stdout
+        try:
+            sys.stderr = open(os.devnull, 'w')
+            sys.stdout = open(os.devnull, 'w')
+            
+            # Suppress RDKit warnings
+            from rdkit import RDLogger
+            RDLogger.DisableLog('rdApp.*')
+            
+            # Import DeepChem (may trigger TensorFlow/Protobuf imports)
+            import deepchem as dc
+            import numpy as np
+            
+            # Create featurizer (may trigger TF deprecation warnings)
+            featurizer = dc.feat.CircularFingerprint(size=fp_size, radius=fp_radius)
+        finally:
+            # Restore stderr/stdout after import and featurizer creation
+            if sys.stderr != stderr_backup:
+                sys.stderr.close()
+                sys.stderr = stderr_backup
+            if sys.stdout != stdout_backup:
+                sys.stdout.close()
+                sys.stdout = stdout_backup
         
         features_list = []
         valid_smiles = []
@@ -381,19 +429,48 @@ def load_input_smiles(input_file_path: str) -> Optional[List[str]]:
         return None
     
     try:
-        smiles_list = load_smiles_from_file(input_file_path)
-        if not smiles_list:
+        smiles_list_raw = load_smiles_from_file(input_file_path)
+        if not smiles_list_raw:
             print("\n⚠️ ERROR: No SMILES molecules found in file.")
             return None
 
-        print(f"\n ✅ Found {len(smiles_list)} SMILES.")
+        print(f"\n✅ Found {len(smiles_list_raw):,} SMILES.")
+        
+        # CRITICAL: Validate and canonicalize SMILES (same as training pipeline)
+        print(" \n 🔄 Validating and canonicalizing SMILES...")
+        
+        # Strategy based on dataset size:
+        # < 1K: Simple processing (no progress)
+        # 1K - 10K: Progress bar (sequential)
+        # > 10K: Chunked + parallel processing (much faster!)
+        if len(smiles_list_raw) < 1000:
+            smiles_list = validate_smiles(smiles_list_raw, show_progress=False)
+        elif len(smiles_list_raw) < 10000:
+            smiles_list = validate_smiles(smiles_list_raw, show_progress=True)
+        else:
+            # For large datasets (10K+), use chunked parallel processing
+            print(f"  ⚡ Large dataset detected - using optimized parallel processing")
+            # Use settings from advanced menu (respect user configuration)
+            n_jobs = get_optimal_workers() if cfg.ENABLE_PARALLEL_PROCESSING else 1
+            chunk_size = min(cfg.PARALLEL_BATCH_SIZE, max(5000, len(smiles_list_raw) // 20))
+            smiles_list = validate_smiles_chunked(smiles_list_raw, chunk_size=chunk_size, n_jobs=n_jobs)
+        
+        if not smiles_list:
+            print("\n⚠️ ERROR: No valid SMILES after canonicalization.")
+            return None
+        
+        invalid_count = len(smiles_list_raw) - len(smiles_list)
+        if invalid_count > 0:
+            print(f" ⚠️ {invalid_count} invalid SMILES removed")
+        
+        print(f" ✅ {len(smiles_list)} valid canonical SMILES")
 
         unique_smiles = list(set(smiles_list))
         duplicates = len(smiles_list) - len(unique_smiles)
         
         if duplicates > 0:
-            print(f"\n⚠️ {duplicates} duplicate SMILES found")
-            print(f" Using {len(unique_smiles)} unique SMILES")
+            print(f"\n ⚠️ {duplicates} duplicate SMILES found (after canonicalization)")
+            print(f" \nUsing {len(unique_smiles)} unique SMILES")
             final_count = len(unique_smiles)
         else:
             final_count = len(smiles_list)
@@ -523,11 +600,19 @@ def featurize_and_save_to_disk(smiles_list: List[str]) -> Tuple[bool, dict]:
                 # Split batch into chunks for parallel processing
                 smiles_chunks = split_into_chunks(batch_smiles, n_workers)
                 
-                # Process batch in parallel (verbose=0 to not clutter output)
-                results = Parallel(n_jobs=n_workers, verbose=0, backend='loky')(
+                # Process chunks with granular progress updates
+                # Using return_as='generator' allows us to update as each chunk completes
+                from joblib import Parallel, delayed
+                
+                results = []
+                for result in Parallel(n_jobs=n_workers, verbose=0, backend='loky', return_as='generator')(
                     delayed(featurize_smiles_chunk)(chunk, cfg.FP_SIZE, cfg.FP_RADIUS)
                     for chunk in smiles_chunks
-                )
+                ):
+                    results.append(result)
+                    # Update progress CORRECTLY: by number of successful+failed molecules processed
+                    features_list, valid_smiles, successful, failed = result
+                    pbar.update(successful + failed)  # Total molecules processed in this chunk
                 
                 # Aggregate batch results
                 for features_list, valid_smiles, successful, failed in results:
@@ -535,9 +620,6 @@ def featurize_and_save_to_disk(smiles_list: List[str]) -> Tuple[bool, dict]:
                     all_valid_smiles.extend(valid_smiles)
                     stats['successful'] += successful
                     stats['failed'] += failed
-                
-                # Update progress bar with molecules processed in this batch
-                pbar.update(len(batch_smiles))
                 
                 # Free memory after each batch
                 del results
@@ -579,38 +661,55 @@ def featurize_and_save_to_disk(smiles_list: List[str]) -> Tuple[bool, dict]:
             cleanup_temp_files(None, cfg.PREDICTION_FEATURIZED_DIR)
             return False, stats
         
-        # ============ CONVERT TO SPARSE FORMAT ============
+        # ============ CONVERT TO SPARSE FORMAT (BATCH-WISE TO AVOID MEMORY ERROR) ============
         stats['end_time'] = datetime.now()
         stats['duration'] = stats['end_time'] - stats['start_time']
         
-        # Stack features into numpy array
-        if all_features:
-            features_dense = np.vstack(all_features)
-            del all_features
-            gc.collect()
-        else:
-            print("\n❌ ERROR: No features to save.")
-            cleanup_temp_files(None, cfg.PREDICTION_FEATURIZED_DIR)
-            return False, stats
-        
-        all_features_sparse = csr_matrix(features_dense)
-        del features_dense
-        gc.collect()
-        
-        # Calculate space savings
-        dense_size_gb = (stats['successful'] * cfg.FP_SIZE * 4) / (1024**3)  # float32
-        sparse_size_mb = (all_features_sparse.data.nbytes + 
-                          all_features_sparse.indices.nbytes + 
-                          all_features_sparse.indptr.nbytes) / (1024**2)
-        sparse_size_gb = sparse_size_mb / 1024
-        stats['space_saved_percent'] = ((dense_size_gb - sparse_size_gb) / dense_size_gb) * 100
-        
-        # ============ SAVE TO HDF5 WITH COMPRESSION ============
-        print("\n💾 Saving...")
+        print("\n💾 Saving to disk...")
         ensure_dir_exists(cfg.PREDICTION_FEATURIZED_DIR)
         hdf5_path = os.path.join(cfg.PREDICTION_FEATURIZED_DIR, 'featurized_data.h5')
         
+        
         try:
+            # Calculate space savings estimate (before processing)
+            dense_size_gb = (stats['successful'] * cfg.FP_SIZE * 4) / (1024**3)  # float32
+            
+            # Process in chunks of max 10K molecules at a time to limit RAM usage
+            SAVE_CHUNK_SIZE = 10000
+            n_save_chunks = (len(all_features) + SAVE_CHUNK_SIZE - 1) // SAVE_CHUNK_SIZE
+            
+            sparse_chunks = []
+            total_sparse_bytes = 0
+            
+            for chunk_idx in range(n_save_chunks):
+                start_idx = chunk_idx * SAVE_CHUNK_SIZE
+                end_idx = min(start_idx + SAVE_CHUNK_SIZE, len(all_features))
+                
+                # Process this chunk
+                chunk_features = all_features[start_idx:end_idx]
+                features_dense_chunk = np.vstack(chunk_features)
+                sparse_chunk = csr_matrix(features_dense_chunk)
+                sparse_chunks.append(sparse_chunk)
+                
+                total_sparse_bytes += (sparse_chunk.data.nbytes + 
+                                       sparse_chunk.indices.nbytes + 
+                                       sparse_chunk.indptr.nbytes)
+                
+                # Free memory immediately
+                del chunk_features, features_dense_chunk
+                gc.collect()
+            
+            # Stack all sparse chunks into final sparse matrix
+            all_features_sparse = sparse_vstack(sparse_chunks)
+            del sparse_chunks
+            gc.collect()
+            
+            # Calculate actual space savings
+            sparse_size_gb = total_sparse_bytes / (1024**3)
+            stats['space_saved_percent'] = ((dense_size_gb - sparse_size_gb) / dense_size_gb) * 100
+            
+            
+            # ============ SAVE TO HDF5 WITH COMPRESSION ============
             with h5py.File(hdf5_path, 'w') as h5f:
                 # Save sparse matrix components with compression
                 h5f.create_dataset('data', data=all_features_sparse.data, 
@@ -638,7 +737,6 @@ def featurize_and_save_to_disk(smiles_list: List[str]) -> Tuple[bool, dict]:
             print(f"\n✅ Featurization completed:")
             print(f" • Successes: {stats['successful']}")
             print(f" • Failures: {stats['failed']}")
-            print(f" • Dataset saved: {hdf5_path}")
                 
         except MemoryError as mem_err:
             print(f"\n💥 MEMORY ERROR during save!")
@@ -768,13 +866,8 @@ def display_summary(stats: dict, success: bool):
 
 def display_parallel_config(n_molecules: int):
     """Display parallel processing configuration from settings.py."""
-    print(f"\n⚙️ Parallel Processing Configuration (from settings.py):")
-    print(f"   • Dataset size: {n_molecules:,} molecules")
-    
     if cfg.ENABLE_PARALLEL_PROCESSING and n_molecules >= cfg.PARALLEL_MIN_THRESHOLD:
         n_workers = get_optimal_workers()
-        print(f"   • Workers to use: {n_workers}")
-        print(f"   • Batch size: {cfg.PARALLEL_BATCH_SIZE:,} molecules")
         print(f"✅ Parallel processing will be used")
     elif cfg.ENABLE_PARALLEL_PROCESSING:
         print(f"⚠️ Dataset too small, using sequential processing")

@@ -349,14 +349,12 @@ def main():
     logger.info("Starting featurization process")
     
     # Display parallel configuration
-    print(f"\n⚙️  Configuration:")
+    print(f"⚙️  Configuration:")
     print(f"   • Fingerprint size: {cfg.FP_SIZE}")
     print(f"   • Fingerprint radius: {cfg.FP_RADIUS}")
     print(f"   • Parallel enabled: {cfg.ENABLE_PARALLEL_PROCESSING}")
     if cfg.ENABLE_PARALLEL_PROCESSING:
         n_workers = get_optimal_workers()
-        print(f"   • Workers: {n_workers}")
-        print(f"   • Min threshold: {cfg.PARALLEL_MIN_THRESHOLD:,} molecules")
     
     train_dir, test_dir, log_content, start_time = setup_environment()
 
@@ -380,10 +378,8 @@ def main():
     log_summary(log_content, train_dataset, test_dataset, duration)
     logger.info("Featurization completed successfully")
 
-    print("\n" + "="*70)
-    print("✅ Fingerprints were generated successfully!")
-    print("="*70)
-    print("\n➡️ Next step: '[3] Training the Model'.")
+    print("\n✅ Fingerprints were generated successfully!")
+    print("➡️ Next step: '[3] Training the Model'.")
 
 if __name__ == '__main__':
     main()

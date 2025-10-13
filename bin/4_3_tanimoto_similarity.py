@@ -134,7 +134,7 @@ def load_datasets(train_path: str, test_path: str) -> Optional[Tuple[pd.DataFram
     """Loads the training and test datasets from CSV files."""
     RDLogger.DisableLog('rdApp.*')
 
-    print(f"\nLoading training and test datasets...")
+    print(f"Loading training and test datasets...")
 
     if not os.path.exists(train_path):
         print(f"\nERROR: Training file '{train_path}' not found.")
@@ -380,7 +380,7 @@ def main():
 
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(report_content)
-        print(f"✅ Report saved: {report_path}")
+        print(f"\n✅ Report saved: {report_path}")
         
     except Exception as e:
         print(f"⚠️ ERROR: Could not save report. {e}")

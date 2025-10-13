@@ -70,7 +70,7 @@ def clean_previous_evaluation_files(results_dir):
 def load_test_data_and_model(test_data_dir, model_dir):
     from rdkit import RDLogger     
     RDLogger.DisableLog('rdApp.*')
-    print(f"\nLoading test dataset from: {test_data_dir}")
+    print(f"Loading test dataset from: {test_data_dir}")
     if not os.path.exists(test_data_dir):
         print(f"\n ⚠️ ERROR: Test directory '{test_data_dir}' not found.")
         return None, None
@@ -223,15 +223,6 @@ def display_summary(metrics):
     print(f"  F1-Score                 : {metrics.get('f1_score', 0):.4f}")
     print("-"*57)
    
-    auc_score = metrics.get('roc_auc', 0)
-    if auc_score >= 0.9:
-        print("🌟 EXCELLENT! Model with fantastic performance! 🌟")
-    elif auc_score >= 0.8:
-        print("✨ VERY GOOD! Solid model performance! ✨")
-    elif auc_score >= 0.7:
-        print("👍 GOOD! Acceptable performance! 👍")
-    else:
-        print("⚠️  IMPROVE: Performance below expectations. ⚠️")
 
 def save_artifacts(metrics, fpr, tpr, roc_auc, y_true, y_pred_proba, y_pred_class, results_dir):
     """Saves the evaluation results to text, CSV, and PNG files."""
@@ -298,7 +289,7 @@ def main():
 
 
     duration = datetime.now() - start_time
-    print(f"\n⏱ Total duration: {str(duration).split('.')[0]} seconds")
+    print(f"\n⏱  Total duration: {str(duration).split('.')[0]} seconds")
     print("\n➡️ Next step: run the remaining detailed evaluation scripts.")
     
     from utils import setup_script_logging

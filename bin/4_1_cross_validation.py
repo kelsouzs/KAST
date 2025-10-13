@@ -39,7 +39,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import settings as cfg
-from utils import ensure_dir_exists, load_smiles_from_file
+from utils import ensure_dir_exists, load_smiles_from_file, validate_smiles
 
 
 # ============================================================================
@@ -135,37 +135,42 @@ def ensure_cv_reproducibility(seed=42):
 def load_and_featurize_all_data():
     from rdkit import RDLogger
     RDLogger.DisableLog('rdApp.*')
-    
-    print("\nLoading all data for Cross-Validation...")
-    
+
+    print("\n📊 Loading and preparing data for Cross-Validation...")
+
     try:
-        actives = load_smiles_from_file(cfg.ACTIVE_SMILES_FILE)
-        inactives = load_smiles_from_file(cfg.INACTIVE_SMILES_FILE)
+        actives_raw = load_smiles_from_file(cfg.ACTIVE_SMILES_FILE, verbose=False)
+        inactives_raw = load_smiles_from_file(cfg.INACTIVE_SMILES_FILE, verbose=False)
+        
+        if not actives_raw or not inactives_raw:
+            print("\n❌ ERROR: Failed to load SMILES files.")
+            print("➡️ Check that the files exist and contain valid data.")
+            return None
+        
+        # Validate and canonicalize SMILES (consistency with training)
+        print(f"  • Loaded: {len(actives_raw)} actives, {len(inactives_raw)} inactives")
+        print(f"  • Validating and normalizing SMILES...")
+        actives = validate_smiles(actives_raw, verbose=True)
+        inactives = validate_smiles(inactives_raw, verbose=True)
         
         if not actives or not inactives:
-            print("\nERROR: Failed to load SMILES files.")
-            print("➡️ Check that the files exist and contain valid data.")
+            print("\n❌ ERROR: No valid SMILES after validation.")
             return None
 
         all_smiles = np.array(actives + inactives)
         all_labels = np.array([1] * len(actives) + [0] * len(inactives))
 
-        print(f"  -> Loaded active molecules: {len(actives)}")
-        print(f"  -> Loaded inactive molecules: {len(inactives)}")
-        print("  -> Featurizing entire dataset...")
+        print(f"  • Valid molecules: {len(actives)} actives, {len(inactives)} inactives")
         
         # Use parallel featurization if enabled and dataset is large enough
         use_parallel = (cfg.ENABLE_PARALLEL_PROCESSING and 
                         len(all_smiles) >= cfg.PARALLEL_MIN_THRESHOLD)
         
         if use_parallel:
-            print(f"  -> Using parallel featurization ({platform.system()})")
+            print(f"  • Featurizing {len(all_smiles)} molecules (parallel mode)...")
             features = featurize_parallel(list(all_smiles), cfg.FP_SIZE, cfg.FP_RADIUS)
         else:
-            if not cfg.ENABLE_PARALLEL_PROCESSING:
-                print(f"  -> Using sequential featurization (parallel disabled)")
-            else:
-                print(f"  -> Using sequential featurization (dataset < {cfg.PARALLEL_MIN_THRESHOLD:,})")
+            print(f"  • Featurizing {len(all_smiles)} molecules (sequential mode)...")
             featurizer = dc.feat.CircularFingerprint(size=cfg.FP_SIZE, radius=cfg.FP_RADIUS)
             features = featurizer.featurize(all_smiles)
         
@@ -174,7 +179,7 @@ def load_and_featurize_all_data():
         labels_valid = all_labels[valid_indices]
         smiles_valid = all_smiles[valid_indices]
         
-        print(f"\n  -> Successfully featurized {len(features_valid)} out of {len(all_smiles)} molecules.")
+        print(f"  ✓ Successfully featurized {len(features_valid)}/{len(all_smiles)} molecules")
         
         return dc.data.NumpyDataset(X=features_valid, y=labels_valid, ids=smiles_valid)
         

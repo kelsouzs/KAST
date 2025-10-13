@@ -97,11 +97,20 @@ def load_and_label_data(active_path, inactive_path):
     print(f"Total inactives loaded: {len(inactive_smiles_raw)}")
     
     # Validate and canonicalize SMILES
-    print("\nValidating SMILES...")
-    print("  -> Validating actives...")
-    active_smiles = validate_smiles(active_smiles_raw)
-    print("  -> Validating inactives...")
-    inactive_smiles = validate_smiles(inactive_smiles_raw)
+    print("\nValidating and canonicalizing SMILES...")
+    
+    # Show progress for large datasets (> 1000 molecules each)
+    show_progress_actives = len(active_smiles_raw) >= 1000
+    show_progress_inactives = len(inactive_smiles_raw) >= 1000
+    
+    if show_progress_actives or show_progress_inactives:
+        print("  (Progress bars shown for large datasets)")
+    
+    print("  • Processing actives...")
+    active_smiles = validate_smiles(active_smiles_raw, show_progress=show_progress_actives)
+    
+    print("  • Processing inactives...")
+    inactive_smiles = validate_smiles(inactive_smiles_raw, show_progress=show_progress_inactives)
     
     if not active_smiles or not inactive_smiles:
         print("\nERROR: No valid SMILES found after validation.")
@@ -127,7 +136,63 @@ def load_and_label_data(active_path, inactive_path):
     return all_data_df
 
 
-def split_data_scaffold(df):
+def get_train_test_split():
+    """
+    Asks user for train/test split preference.
+    Returns test_fraction (e.g., 0.2 for 80/20)
+    """
+    print("\n" + "="*70)
+    print("� TRAIN/TEST SPLIT CONFIGURATION")
+    print("="*70)
+    print(f"\nCurrent default (settings.py): {(1-cfg.TEST_SET_FRACTION)*100:.0f}% train / {cfg.TEST_SET_FRACTION*100:.0f}% test")
+    print("\nCommon splits:")
+    print("  1. 80% train / 20% test  (recommended for small datasets)")
+    print("  2. 70% train / 30% test  (more data for testing)")
+    print("  3. 90% train / 10% test  (maximize training data)")
+    print("  4. Use settings.py value (no change)")
+    print("  5. Custom split")
+    
+    while True:
+        try:
+            choice = input("\nSelect option (1-5): ").strip()
+            
+            if choice == '1':
+                return 0.2  # 80/20
+            elif choice == '2':
+                return 0.3  # 70/30
+            elif choice == '3':
+                return 0.1  # 90/10
+            elif choice == '4':
+                return cfg.TEST_SET_FRACTION  # From settings.py
+            elif choice == '5':
+                while True:
+                    try:
+                        test_pct = float(input("Enter test percentage (e.g., 20 for 20%): "))
+                        if 5 <= test_pct <= 50:
+                            return test_pct / 100.0
+                        else:
+                            print("⚠️  Test percentage should be between 5% and 50%")
+                    except ValueError:
+                        print("⚠️  Invalid input. Enter a number (e.g., 20)")
+            else:
+                print("⚠️  Invalid option. Choose 1-5")
+        except KeyboardInterrupt:
+            print("\n\n⚠️  Using default from settings.py")
+            return cfg.TEST_SET_FRACTION
+
+
+def split_data_scaffold(df, test_fraction=None):
+    """
+    Splits data using scaffold split method.
+    
+    Args:
+        df: DataFrame with SMILES and labels
+        test_fraction: Fraction for test set (if None, asks user)
+    """
+    # Ask user if test_fraction not provided
+    if test_fraction is None:
+        test_fraction = get_train_test_split()
+    
     try:
         dataset = dc.data.NumpyDataset(
             X=np.zeros((len(df), 1)),
@@ -136,12 +201,13 @@ def split_data_scaffold(df):
         )
         
         splitter = dc.splits.ScaffoldSplitter()
-        train_frac = 1.0 - cfg.TEST_SET_FRACTION
+        train_frac = 1.0 - test_fraction
         
-        print(f"\nSplitting data: {train_frac*100:.1f}% train, {cfg.TEST_SET_FRACTION*100:.1f}% test...")
+        print(f"\n✅ Using split: {train_frac*100:.1f}% train / {test_fraction*100:.1f}% test")
+        print(f"\nSplitting data...")
         
         train_indices, test_indices, _ = splitter.split(
-            dataset, frac_train=train_frac, frac_valid=cfg.TEST_SET_FRACTION, frac_test=0.0
+            dataset, frac_train=train_frac, frac_valid=test_fraction, frac_test=0.0
         )
         
         train_set = df.iloc[train_indices]
@@ -166,12 +232,12 @@ def split_data_scaffold(df):
         print("Oops, something went wrong. Trying random split...")
         
         shuffled_df = df.sample(frac=1, random_state=cfg.RANDOM_STATE).reset_index(drop=True)
-        split_idx = int(len(shuffled_df) * (1.0 - cfg.TEST_SET_FRACTION))
+        split_idx = int(len(shuffled_df) * (1.0 - test_fraction))
         
         train_set = shuffled_df[:split_idx]
         test_set = shuffled_df[split_idx:]
         
-        print(f"✅ Random split successful.")
+        print(f"✅ Random split successful (using {train_frac*100:.0f}/{test_fraction*100:.0f})")
         
         # Fallback distribution statistics
         print("\nClass distribution:")
@@ -230,7 +296,7 @@ def main():
     
     total_valid = active_count + inactive_count
     print(f"\n✅ Dataset ready: {total_valid} valid molecules ({active_count} actives, {inactive_count} inactives)")
-
+    
     train_dataset, test_dataset = split_data_scaffold(all_data)
 
     save_datasets(train_dataset, test_dataset)

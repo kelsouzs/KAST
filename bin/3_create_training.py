@@ -1,8 +1,8 @@
 """
-K-talysticFlow - Step 3: Model Training
+K-talysticFlow - Step 3: Model Creation and Training
 
-This script trains a Deep Learning model for molecular activity classification
-using the featurized data generated in the previous step.
+This script creates and trains a Deep Learning model for molecular activity 
+classification using the featurized data generated in the previous step.
 """
 
 import sys
@@ -179,9 +179,9 @@ def main():
     ensure_training_reproducibility(seed=42)
     
     from utils import print_script_banner, setup_script_logging
-    logger = setup_script_logging("3_training")
+    logger = setup_script_logging("3_create_training")
     
-    print_script_banner("K-talysticFlow | Step 3: Training the Model")
+    print_script_banner("K-talysticFlow | Step 3: Creating and Training the Model")
     logger.info("Starting model training")
 
     from rdkit import RDLogger

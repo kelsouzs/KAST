@@ -43,7 +43,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import settings as cfg
-from utils import ensure_dir_exists, load_smiles_from_file
+from utils import ensure_dir_exists, load_smiles_from_file, validate_smiles
 
 # --- Helper Functions ---
 
@@ -52,23 +52,32 @@ def load_and_featurize_data() -> Optional[Tuple[np.ndarray, np.ndarray]]:
     from rdkit import RDLogger
     RDLogger.DisableLog('rdApp.*')
     
-    print("\nLoading data...")
+    print("\n📊 Loading and preparing data for Learning Curve...")
     
     try:
-        actives = load_smiles_from_file(cfg.ACTIVE_SMILES_FILE)
-        inactives = load_smiles_from_file(cfg.INACTIVE_SMILES_FILE)
+        actives_raw = load_smiles_from_file(cfg.ACTIVE_SMILES_FILE, verbose=False)
+        inactives_raw = load_smiles_from_file(cfg.INACTIVE_SMILES_FILE, verbose=False)
         
-        if not actives or not inactives: 
-            print("\n⚠️ ERROR: Active or inactive files not found.")
+        if not actives_raw or not inactives_raw: 
+            print("\n❌ ERROR: Active or inactive files not found.")
             print("➡️ Verify that the SMILES files exist.")
+            return None
+        
+        # Validate and canonicalize SMILES (consistency with training)
+        print(f"  • Loaded: {len(actives_raw)} actives, {len(inactives_raw)} inactives")
+        print(f"  • Validating and normalizing SMILES...")
+        actives = validate_smiles(actives_raw, verbose=True)
+        inactives = validate_smiles(inactives_raw, verbose=True)
+        
+        if not actives or not inactives:
+            print("\n❌ ERROR: No valid SMILES after validation.")
             return None
 
         all_smiles = actives + inactives
         all_labels = np.array([1] * len(actives) + [0] * len(inactives))
         
-        print(f"\nActive molecules: {len(actives)}")
-        print(f"Inactive molecules: {len(inactives)}")
-        print("\nCalculating fingerprints...")
+        print(f"  • Valid molecules: {len(actives)} actives, {len(inactives)} inactives")
+        print(f"  • Calculating fingerprints for {len(all_smiles)} molecules...")
         
         featurizer = dc.feat.CircularFingerprint(size=cfg.FP_SIZE, radius=cfg.FP_RADIUS)
         features = featurizer.featurize(all_smiles)
@@ -87,7 +96,7 @@ def load_and_featurize_data() -> Optional[Tuple[np.ndarray, np.ndarray]]:
 
 def generate_learning_curve_points(features: np.ndarray, labels: np.ndarray) -> Tuple[List[int], List[float], List[float]]:
     """Generates training and validation scores for different dataset sizes."""
-    print("\nSplitting validation set...")
+    print("\n📈 Generating Learning Curve...")
     
     try:
         features_train_pool, val_features, labels_train_pool, val_labels = train_test_split(
@@ -95,16 +104,17 @@ def generate_learning_curve_points(features: np.ndarray, labels: np.ndarray) -> 
         )
         val_dataset = dc.data.NumpyDataset(X=val_features, y=val_labels)
         
-        print(f"Training pool: {len(features_train_pool)} samples")
-        print(f"Fixed validation: {len(val_features)} samples")
+        print(f"  • Training pool: {len(features_train_pool)} samples")
+        print(f"  • Validation set: {len(val_features)} samples")
 
         # Define training sizes (10% to 100% in 10 points)
         train_sizes_fractions = np.linspace(0.1, 1.0, 10, endpoint=True)
         train_scores, val_scores, actual_train_sizes = [], [], []
 
-        print(f"Generating {len(train_sizes_fractions)} learning curve points...")
+        print(f"  • Computing {len(train_sizes_fractions)} curve points...\n")
         
-        for i, frac in enumerate(tqdm(train_sizes_fractions, desc="Curve Progress")):
+        for i, frac in enumerate(tqdm(train_sizes_fractions, desc="  Progress", 
+                                       bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]')):
             try:
                 # Select subset of training pool
                 if frac < 1.0:
@@ -119,7 +129,6 @@ def generate_learning_curve_points(features: np.ndarray, labels: np.ndarray) -> 
                 
                 # Check minimum size
                 if len(current_train_features) < 10: 
-                    print(f"    -> Point {i+1}: too few samples ({len(current_train_features)}), skipping...")
                     continue
                 
                 train_subset = dc.data.NumpyDataset(X=current_train_features, y=current_train_labels)
@@ -153,12 +162,14 @@ def generate_learning_curve_points(features: np.ndarray, labels: np.ndarray) -> 
                 val_scores.append(val_auc)
                 actual_train_sizes.append(len(current_train_features))
                 
-                print(f"\nPoint {i+1}: {len(current_train_features)} samples | "
-                      f"Training: {train_auc:.3f} | Validation: {val_auc:.3f}")
-                
             except Exception as e:
-                print(f"\n⚠️ ERROR at point {i+1}: {e}")
                 continue
+        
+        # Print results after progress bar
+        print(f"\n  ✓ Generated {len(actual_train_sizes)} curve points")
+        print("\n  📊 Results:")
+        for i, (size, train_auc, val_auc) in enumerate(zip(actual_train_sizes, train_scores, val_scores)):
+            print(f"    Point {i+1:2d}: {size:3d} samples → Train: {train_auc:.3f} | Val: {val_auc:.3f}")
 
         return actual_train_sizes, train_scores, val_scores
         
@@ -257,13 +268,13 @@ def display_summary(train_scores: List[float], val_scores: List[float]):
     final_val_score = val_scores[-1]
     gap = final_train_score - final_val_score
 
-    print("\n" + "-"*57)
-    print("LEARNING CURVE SUMMARY".center(57))
-    print("-"*57)
-    print(f"  Final Training AUC        : {final_train_score:.4f}")
-    print(f"  Final Validation AUC      : {final_val_score:.4f}")
-    print(f"  Gap (Training - Validation): {gap:.4f}")
-    print("-"*57)
+    print("\n" + "-"*60)
+    print("  LEARNING CURVE SUMMARY".center(60))
+    print("-"*60)
+    print(f"  Final Training AUC         : {final_train_score:.4f}")
+    print(f"  Final Validation AUC       : {final_val_score:.4f}")
+    print(f"  Gap (Train - Validation)   : {gap:.4f}")
+    print("-"*60)
 
 # --- Main Function ---
 def main():
@@ -290,7 +301,13 @@ def main():
         logger.error("Failed to generate learning curve points")
         sys.exit(1)
 
-    # Step 3: Save detailed report
+    # Step 3: Display summary
+    display_summary(train_scores, val_scores)
+    
+    # Step 4: Save graph
+    plot_and_save_curve(train_sizes, train_scores, val_scores)
+    
+    # Step 5: Save detailed report
     try:
         report_content = generate_learning_curve_report(train_sizes, train_scores, val_scores)
         report_path = os.path.join(cfg.RESULTS_DIR, '4_4_learning_curve_results.txt')
@@ -298,14 +315,10 @@ def main():
         with open(report_path, 'w') as f:
             f.write(report_content)
 
-        print(f"\n✅ Detailed report saved: {report_path}")
+        print(f"\n💾 Detailed report: {report_path}")
 
     except Exception as e:
         print(f"\n⚠️ ERROR saving report: {e}")
-
-    # Step 4: Display summary and save graph
-    display_summary(train_scores, val_scores)
-    plot_and_save_curve(train_sizes, train_scores, val_scores)
 
     print("\n✅ Learning Curve Generation completed successfully!")
     logger.info("Learning curve generation completed successfully")

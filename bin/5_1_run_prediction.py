@@ -353,7 +353,7 @@ def run_prediction(model: dc.models.Model, features_sparse: csr_matrix, smiles_l
     Run predictions on sparse feature matrix.
     Uses parallel processing if enabled in settings.py.
     """
-    print(f"\n🔮 Running predictions for {len(smiles_list):,} molecules...")
+    print(f"\n🔮 Running predictions...")
     
     try:
         batch_size = 512
@@ -377,8 +377,7 @@ def run_prediction(model: dc.models.Model, features_sparse: csr_matrix, smiles_l
                 batches.append((i // batch_size, batch_sparse))
             
             # Process batches in parallel with tqdm progress bar (by total molecules)
-            print(f"\n🚀 Processing {total_batches} batches with {n_workers} workers...")
-            print(f"   📊 Total molecules: {total_molecules:,}")
+            print(f"\n🚀 Processing...")
             print()
             
             from tqdm import tqdm

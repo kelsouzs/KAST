@@ -167,6 +167,7 @@ def show_credits():
         Clears screen before displaying information
     """
     os.system('cls' if os.name == 'nt' else 'clear')
+    display_splash_screen()
     print_menu_header("ABOUT & HOW TO CITE")
     print(f"\n  Project: \t{__project_name__} ({__project_acronym__})")
     print(f"  Version: \t{__version__} ({__status__})")
@@ -278,6 +279,7 @@ def step_4_evaluation_menu():
     """Displays evaluation submenu allowing single or all evaluations"""
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')
+        display_splash_screen()
         print_menu_header("Submenu [4] - Model Evaluation")
         print("\n  [1] Run ALL evaluations in sequence")
         print("  [2] Run a SPECIFIC evaluation")
@@ -299,6 +301,7 @@ def step_4_evaluation_menu():
         elif sub_choice == '2':
             while True:
                 os.system('cls' if os.name == 'nt' else 'clear')
+                display_splash_screen()
                 print(SEPARATOR)
                 print("EVALUATION TESTS - Select an Option".center(MENU_WIDTH))
                 print(SEPARATOR)
@@ -330,6 +333,7 @@ def step_5_prediction_menu():
     """Submenu for predictions on new molecules with modular options"""
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')
+        display_splash_screen()
         print_menu_header("Submenu [5] - Predict New Molecules")
         print("\n  [1] Only Featurize (Prepare dataset)")
         print("  [2] Only Predict (Use existing dataset)")

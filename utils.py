@@ -297,7 +297,8 @@ def validate_smiles_chunked(smiles_list: List[str], chunk_size: int = 100000,
     total_normalized = 0
     
     # Process chunks with progress bar (showing molecules, not chunks!)
-    pbar = tqdm(total=total, desc="   Canonicalizing", unit="mol", unit_scale=True)
+    print()
+    pbar = tqdm(total=total, desc="Validating", unit="mol", unit_scale=True)
     
     for chunk_idx in range(num_chunks):
         start_idx = chunk_idx * chunk_size
@@ -321,7 +322,10 @@ def validate_smiles_chunked(smiles_list: List[str], chunk_size: int = 100000,
     
     pbar.close()
     
-    print(f"  \n ✓ Processed {len(all_valid_smiles):,}/{total:,} valid molecules")
+    print(f"   ✓ Processed {len(all_valid_smiles):,}/{total:,} valid molecules")
+
+    # Return the list of valid canonical SMILES so callers receive the results
+    return all_valid_smiles
 
 
 def load_and_featurize_full_dataset() -> Optional[dc.data.Dataset]:

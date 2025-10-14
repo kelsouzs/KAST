@@ -47,7 +47,7 @@ if project_root not in sys.path:
 
 import settings as cfg
 from utils import ensure_dir_exists
-
+from main import display_splash_screen
 
 def clean_previous_evaluation_files(results_dir):
     """Checks if there are old evaluation files and asks for confirmation to delete them."""
@@ -256,7 +256,8 @@ def main():
     """Main function to run model evaluation."""
     from utils import print_script_banner, setup_script_logging
     logger = setup_script_logging("4_0_evaluation")
-    
+
+    display_splash_screen()
     print_script_banner("K-talysticFlow | Step 4: Main Model Evaluation")
     logger.info("Starting model evaluation")
 

@@ -732,7 +732,8 @@ def main():
     
     from utils import print_script_banner, setup_script_logging
     logger = setup_script_logging("5_1_run_prediction")
-    
+
+    display_splash_screen()
     print_script_banner("K-talysticFlow | Step 5.1: Running Predictions")
     logger.info("Starting prediction on new molecules")
     

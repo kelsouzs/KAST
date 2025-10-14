@@ -37,6 +37,7 @@ if project_root not in sys.path:
 
 import settings as cfg
 from utils import ensure_dir_exists
+from main import display_splash_screen
 
 # --- Helper Functions ---
 
@@ -151,7 +152,8 @@ def display_summary(ef_results: dict):
 def main():
     from utils import print_script_banner, setup_script_logging
     logger = setup_script_logging("4_2_enrichment_factor")
-    
+
+    display_splash_screen()
     print_script_banner("K-talysticFlow | Step 4.2: Enrichment Factor (EF) Calculation")
     logger.info("Starting enrichment factor calculation")
 

@@ -40,6 +40,7 @@ if project_root not in sys.path:
 
 import settings as cfg
 from utils import ensure_dir_exists, load_smiles_from_file, validate_smiles
+from main import display_splash_screen
 
 def warn_and_confirm_data_files(data_dir):
     """
@@ -266,7 +267,7 @@ def save_datasets(train_df, test_df):
 def main():
     from utils import print_script_banner, setup_script_logging, log_error
     logger = setup_script_logging("1_preparation")
-    
+    display_splash_screen()
     print_script_banner("K-talysticFlow | Step 1: Preparing and Splitting Data")
     logger.info("Starting data preparation and splitting")
 

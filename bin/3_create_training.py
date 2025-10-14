@@ -35,6 +35,7 @@ if project_root not in sys.path:
 
 import settings as cfg
 from utils import ensure_dir_exists
+from main import display_splash_screen
 
 def ensure_training_reproducibility(seed=42):
     """Sets the seeds to ensure reproducibility."""
@@ -180,7 +181,8 @@ def main():
     
     from utils import print_script_banner, setup_script_logging
     logger = setup_script_logging("3_create_training")
-    
+
+    display_splash_screen()
     print_script_banner("K-talysticFlow | Step 3: Creating and Training the Model")
     logger.info("Starting model training")
 

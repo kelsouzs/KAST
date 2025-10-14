@@ -10,6 +10,11 @@ PACKAGE_IMPORT_MAP = {
     'rdkit': 'rdkit'      # Common name
 }
 
+# Fix common hyphenated package import names
+PACKAGE_IMPORT_MAP.update({
+    'pytorch-lightning': 'pytorch_lightning',
+})
+
 # Terminal color codes
 GREEN = '\033[92m'
 RED = '\033[91m'

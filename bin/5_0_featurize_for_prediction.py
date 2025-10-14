@@ -85,6 +85,7 @@ if project_root not in sys.path:
 import settings as cfg
 from utils import ensure_dir_exists, load_smiles_from_file, validate_smiles, validate_smiles_chunked
 from deepchem.data import DiskDataset  
+from main import display_splash_screen
 
 # ============================================================================
 # PARALLEL FEATURIZATION FUNCTIONS (Cross-platform: Windows + Linux)
@@ -878,7 +879,8 @@ def display_parallel_config(n_molecules: int):
 def main():
     from utils import print_script_banner, setup_script_logging
     logger = setup_script_logging("5_0_featurize_prediction")
-    
+
+    display_splash_screen()
     print_script_banner("K-talysticFlow | Step 5.0: Featurization for Prediction")
     logger.info("Starting featurization for prediction")
     

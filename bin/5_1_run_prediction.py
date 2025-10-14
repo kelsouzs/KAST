@@ -55,7 +55,7 @@ if project_root not in sys.path:
 
 import settings as cfg
 from utils import ensure_dir_exists
-
+from main import display_splash_screen
 
 # ============================================================================
 # PARALLEL PREDICTION FUNCTIONS

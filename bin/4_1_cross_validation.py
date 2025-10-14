@@ -40,7 +40,7 @@ if project_root not in sys.path:
 
 import settings as cfg
 from utils import ensure_dir_exists, load_smiles_from_file, validate_smiles
-
+from main import display_splash_screen
 
 # ============================================================================
 # PARALLEL FEATURIZATION FOR CROSS-VALIDATION
@@ -294,7 +294,8 @@ def main():
     
     from utils import print_script_banner, setup_script_logging
     logger = setup_script_logging("4_1_cross_validation")
-    
+
+    display_splash_screen()
     print_script_banner("K-talysticFlow | Step 4.1: Cross-Validation")
     logger.info("Starting cross-validation")
 

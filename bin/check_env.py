@@ -1,6 +1,7 @@
 import sys
 import os
 import importlib.util
+from main import display_splash_screen
 
 # Package mapping (pip) to import names (python)
 # Add others here if needed. Ex: 'beautifulsoup4': 'bs4'
@@ -87,5 +88,6 @@ def check_dependencies():
         return False
 
 if __name__ == "__main__":
+    display_splash_screen()
     all_ok = check_dependencies()
     sys.exit(0 if all_ok else 1) # Returns 0 for success, 1 for error

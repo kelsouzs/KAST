@@ -1,7 +1,6 @@
 import sys
 import os
 import importlib.util
-from main import display_splash_screen
 
 # Package mapping (pip) to import names (python)
 # Add others here if needed. Ex: 'beautifulsoup4': 'bs4'
@@ -47,7 +46,10 @@ def check_dependencies():
         sys.path.insert(0, project_root)
     
     from utils import print_script_banner
+    from main import display_splash_screen
+    display_splash_screen()
     print_script_banner("Checking Environment Dependencies")
+    
     
     # Script is in /bin, requirements.txt is in parent directory (root)
     req_path = os.path.join(os.path.dirname(__file__), '..', 'requirements.txt')
@@ -79,7 +81,7 @@ def check_dependencies():
             print(f"  - {pkg}")
         
         print(f"\n{YELLOW}--- Recommended Actions ---{RESET}")
-        print("1. Make sure your conda environment ('modelo_preditivo') is activated.")
+        print("1. Make sure your conda environment is activated.")
         if 'rdkit' in [p.lower() for p in missing_packages]:
             print(f"2. For {YELLOW}RDKit{RESET}, use the specific command:")
             print(f"   {YELLOW}conda install -c conda-forge rdkit{RESET}")
@@ -88,6 +90,5 @@ def check_dependencies():
         return False
 
 if __name__ == "__main__":
-    display_splash_screen()
     all_ok = check_dependencies()
     sys.exit(0 if all_ok else 1) # Returns 0 for success, 1 for error

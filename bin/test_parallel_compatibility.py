@@ -1,7 +1,6 @@
 
 import sys
 import os
-from main import display_splash_screen
 
 # Add project root to path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -197,7 +196,6 @@ def test_parallel_threshold_logic():
 
 def main():
     """Run all tests"""
-    display_splash_screen()
     print("\n" + "🔍 " + "="*66)
     print("  PARALLEL PROCESSING COMPATIBILITY TEST SUITE")
     print("="*68 + " 🔍\n")
@@ -254,4 +252,5 @@ def main():
 if __name__ == "__main__":
     success = main()
     sys.exit(0 if success else 1)
+
 

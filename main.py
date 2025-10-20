@@ -406,7 +406,7 @@ def configure_parallel_workers():
         - Prints confirmation messages
     """
     from multiprocessing import cpu_count
-
+    
     display_splash_screen()
     print_menu_header("Configure Parallel Processing")
     

@@ -94,8 +94,7 @@ def ensure_dir_exists(dir_path: str):
     Ensures that a directory exists. Creates it if not present.
     """
     if not os.path.exists(dir_path):
-        print(f"\nINFO: Creating missing directory: {dir_path}")
-        os.makedirs(dir_path)
+        os.makedirs(dir_path, exist_ok=True)
 
 def normalize_molecule(mol: Chem.Mol) -> Optional[Chem.Mol]:
     """

@@ -256,7 +256,7 @@ def main():
     """Main function to run model evaluation."""
     from utils import print_script_banner, setup_script_logging
     logger = setup_script_logging("4_0_evaluation")
-
+    
     display_splash_screen()
     print_script_banner("K-talysticFlow | Step 4: Main Model Evaluation")
     logger.info("Starting model evaluation")

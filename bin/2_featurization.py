@@ -53,7 +53,6 @@ import settings as cfg
 from utils import ensure_dir_exists
 from main import display_splash_screen
 
-
 # ============================================================================
 # PARALLEL FEATURIZATION FUNCTIONS
 # ============================================================================
@@ -345,7 +344,7 @@ def log_summary(log_content, train_dataset, test_dataset, duration):
 def main():
     from utils import print_script_banner, setup_script_logging
     logger = setup_script_logging("2_featurization")
-  
+
     display_splash_screen()
     print_script_banner("K-talysticFlow | Step 2: Generating Fingerprints")
     logger.info("Starting featurization process")

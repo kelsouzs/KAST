@@ -37,7 +37,6 @@ if project_root not in sys.path:
 
 import settings as cfg
 from utils import ensure_dir_exists
-from main import display_splash_screen
 
 # --- Helper Functions ---
 
@@ -133,6 +132,8 @@ def generate_ef_report(y_true: np.ndarray, y_score: np.ndarray) -> Tuple[str, Di
 
 def display_summary(ef_results: dict):
     """Displays a formatted summary of Enrichment Factor results."""
+    from main import display_splash_screen
+    display_splash_screen()
     print("\n" + "-"*57)
     print("ENRICHMENT FACTOR (EF) SUMMARY".center(57))
     print("-"*57)
@@ -152,8 +153,7 @@ def display_summary(ef_results: dict):
 def main():
     from utils import print_script_banner, setup_script_logging
     logger = setup_script_logging("4_2_enrichment_factor")
-
-    display_splash_screen()
+    
     print_script_banner("K-talysticFlow | Step 4.2: Enrichment Factor (EF) Calculation")
     logger.info("Starting enrichment factor calculation")
 

@@ -55,7 +55,7 @@ if project_root not in sys.path:
 
 import settings as cfg
 from utils import ensure_dir_exists
-from main import display_splash_screen
+
 
 # ============================================================================
 # PARALLEL PREDICTION FUNCTIONS
@@ -282,27 +282,72 @@ def load_sparse_hdf5_data(dataset_dir: str = None) -> Optional[Tuple[csr_matrix,
     
     try:
         with h5py.File(hdf5_path, 'r') as h5f:
-            # Load sparse matrix components
-            data = h5f['data'][:]
-            indices = h5f['indices'][:]
-            indptr = h5f['indptr'][:]
-            shape = tuple(h5f['shape'][:])
+            # Check dataset size first
+            total_molecules = h5f.attrs['total_molecules']
+            file_size_mb = os.path.getsize(hdf5_path) / (1024**2)
             
-            # Reconstruct sparse matrix
-            features_sparse = csr_matrix((data, indices, indptr), shape=shape)
-            
-            # Load SMILES
-            smiles_list = [s.decode('utf-8') if isinstance(s, bytes) else s 
-                          for s in h5f['smiles'][:]]
+            # For large datasets (>100k), show progress
+            if total_molecules > 100000:
+                from tqdm import tqdm
+                print(f"  • Large dataset detected ({total_molecules:,} molecules, {file_size_mb:.1f} MB)")
+                
+                # Load sparse components in chunks (show progress to avoid appearing stuck)
+                data_ds = h5f['data']
+                indices_ds = h5f['indices']
+                indptr_ds = h5f['indptr']
+                shape = tuple(h5f['shape'][:])
+
+                # Helper to read a dataset in chunks and concatenate
+                def read_in_chunks(ds, desc, unit='elem'):
+                    total_len = ds.shape[0]
+                    # choose chunk size: aim ~100 chunks or at least 100k elements
+                    approx_chunk = max(100_000, total_len // 100)
+                    parts = []
+                    for start in tqdm(range(0, total_len, approx_chunk), desc=desc, unit=unit):
+                        end = min(start + approx_chunk, total_len)
+                        parts.append(ds[start:end])
+                    if parts:
+                        return np.concatenate(parts)
+                    else:
+                        return np.array([], dtype=ds.dtype)
+                print()
+                data = read_in_chunks(data_ds, desc="  Loading data")
+                print()
+                indices = read_in_chunks(indices_ds, desc="  Loading indices")
+                print()
+                indptr = read_in_chunks(indptr_ds, desc="  Loading indptr")
+
+                # Reconstruct sparse matrix
+                features_sparse = csr_matrix((data, indices, indptr), shape=shape)
+                
+                # Load SMILES with progress bar (this is the slow part!)
+                smiles_raw = h5f['smiles'][:]
+                smiles_list = []
+                
+                print()
+                for s in tqdm(smiles_raw, desc="  Processing", unit="mol", unit_scale=True):
+                    decoded = s.decode('utf-8') if isinstance(s, bytes) else s
+                    smiles_list.append(decoded)
+            else:
+                # Small dataset - load without progress bar
+                data = h5f['data'][:]
+                indices = h5f['indices'][:]
+                indptr = h5f['indptr'][:]
+                shape = tuple(h5f['shape'][:])
+                
+                # Reconstruct sparse matrix
+                features_sparse = csr_matrix((data, indices, indptr), shape=shape)
+                
+                # Load SMILES
+                smiles_list = [s.decode('utf-8') if isinstance(s, bytes) else s 
+                              for s in h5f['smiles'][:]]
             
             # Load metadata
-            total_molecules = h5f.attrs['total_molecules']
             space_saved = h5f.attrs.get('space_saved_percent', 0)
-            
-            file_size_mb = os.path.getsize(hdf5_path) / (1024**2)
             
             print(f"\n✅ Dataset loaded successfully:")
             print(f"  • Molecules: {total_molecules:,}")
+            print(f"  • File size: {file_size_mb:.1f} MB")
             
             return features_sparse, smiles_list
             
@@ -730,10 +775,11 @@ def display_and_save_results(results_df: pd.DataFrame, custom_filename: str, smi
 def main():
     ensure_reproducibility(seed=42)
     
+    from main import display_splash_screen
+    display_splash_screen()
     from utils import print_script_banner, setup_script_logging
     logger = setup_script_logging("5_1_run_prediction")
-
-    display_splash_screen()
+    
     print_script_banner("K-talysticFlow | Step 5.1: Running Predictions")
     logger.info("Starting prediction on new molecules")
     

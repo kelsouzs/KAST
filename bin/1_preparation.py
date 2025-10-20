@@ -267,6 +267,7 @@ def save_datasets(train_df, test_df):
 def main():
     from utils import print_script_banner, setup_script_logging, log_error
     logger = setup_script_logging("1_preparation")
+    
     display_splash_screen()
     print_script_banner("K-talysticFlow | Step 1: Preparing and Splitting Data")
     logger.info("Starting data preparation and splitting")

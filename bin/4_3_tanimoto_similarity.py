@@ -44,7 +44,7 @@ if project_root not in sys.path:
 
 import settings as cfg
 from utils import ensure_dir_exists, get_morgan_fp
-from main import display_splash_screen
+
 
 # ============================================================================
 # PARALLEL FINGERPRINT CALCULATION
@@ -338,8 +338,9 @@ def display_summary(similarities: List[float]) -> float:
 def main():
     from utils import print_script_banner, setup_script_logging
     logger = setup_script_logging("4_3_tanimoto_similarity")
-
+    from main import display_splash_screen
     display_splash_screen()
+
     print_script_banner("K-talysticFlow | Step 4.3: Tanimoto Similarity Analysis")
     logger.info("Starting Tanimoto similarity analysis")
 

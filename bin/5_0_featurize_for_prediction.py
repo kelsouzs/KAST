@@ -420,7 +420,7 @@ def check_and_handle_existing_data(output_dir: str) -> bool:
 
 def load_input_smiles(input_file_path: str) -> Optional[List[str]]:
     """Loads SMILES molecules from the specified input file."""
-    print(f"\n Loading molecules from: {input_file_path}")
+    print(f"\n🔄 Loading molecules from: {input_file_path}")
     
     if not os.path.exists(input_file_path):
         print(f"\n⚠️ ERROR: Input file '{input_file_path}' not found.")
@@ -579,19 +579,38 @@ def featurize_and_save_to_disk(smiles_list: List[str]) -> Tuple[bool, dict]:
             batch_size = cfg.PARALLEL_BATCH_SIZE
             n_batches = (len(smiles_list) + batch_size - 1) // batch_size
             
-            all_features = []
-            all_valid_smiles = []
+            # We'll write incremental outputs to HDF5 to avoid holding everything in RAM
+            # Do NOT accumulate all_features/all_valid_smiles here (OOM risk)
+            all_valid_smiles = []  # used only for temporary batch appends
             
             print(f"\n📊 Processing {len(smiles_list):,} molecules in {n_batches} batches...")
             print(f"  • Batch size: {batch_size:,} molecules")
             print(f"  • Workers per batch: {n_workers}")
+            
+            # Prepare HDF5 file for incremental append (create dir BEFORE progress bar!)
+            ensure_dir_exists(cfg.PREDICTION_FEATURIZED_DIR)
+            hdf5_path = os.path.join(cfg.PREDICTION_FEATURIZED_DIR, 'featurized_data.h5')
             print()
             
             # Process batches with tqdm progress bar (by total molecules)
-            from tqdm import tqdm
-            
+            # `tqdm` already imported at module level; avoid local import here
             pbar = tqdm(total=len(smiles_list), desc="Featurizing", unit="mol", unit_scale=True)
-            
+
+            # Initialize counters for incremental storage
+            total_rows = 0
+            total_nnz = 0
+
+            # Open file once and append per batch
+            h5f = h5py.File(hdf5_path, 'w')
+            # Create extendable datasets (1D arrays for CSR components)
+            maxshape_none = (None,)
+            h5_data = h5f.create_dataset('data', shape=(0,), maxshape=maxshape_none, dtype=np.float32, compression='gzip')
+            h5_indices = h5f.create_dataset('indices', shape=(0,), maxshape=maxshape_none, dtype=np.int32, compression='gzip')
+            h5_indptr = h5f.create_dataset('indptr', shape=(1,), maxshape=maxshape_none, dtype=np.int64, compression='gzip')
+            # start indptr with 0
+            h5_indptr[:] = np.array([0], dtype=np.int64)
+            h5_smiles = h5f.create_dataset('smiles', shape=(0,), maxshape=maxshape_none, dtype=h5py.string_dtype(encoding='utf-8'), compression='gzip')
+
             for batch_idx in range(n_batches):
                 start_idx = batch_idx * batch_size
                 end_idx = min(start_idx + batch_size, len(smiles_list))
@@ -613,23 +632,109 @@ def featurize_and_save_to_disk(smiles_list: List[str]) -> Tuple[bool, dict]:
                     # Update progress CORRECTLY: by number of successful+failed molecules processed
                     features_list, valid_smiles, successful, failed = result
                     pbar.update(successful + failed)  # Total molecules processed in this chunk
-                
-                # Aggregate batch results
+
+                # For this batch: aggregate only batch-level features and write to disk
+                batch_features = []
+                batch_valid_smiles = []
                 for features_list, valid_smiles, successful, failed in results:
-                    all_features.extend(features_list)
-                    all_valid_smiles.extend(valid_smiles)
+                    batch_features.extend(features_list)
+                    batch_valid_smiles.extend(valid_smiles)
                     stats['successful'] += successful
                     stats['failed'] += failed
-                
-                # Free memory after each batch
-                del results
+
+                # If no successful features in batch, continue
+                if len(batch_features) == 0:
+                    # Clean up and continue
+                    del results, batch_features, batch_valid_smiles
+                    gc.collect()
+                    continue
+
+                # Convert batch to dense then to sparse (batch-level)
+                try:
+                    features_dense_batch = np.vstack(batch_features)
+                    batch_sparse = csr_matrix(features_dense_batch)
+                except Exception as e:
+                    print(f"\n⚠️ Error: {e}")
+                    del results, batch_features, batch_valid_smiles
+                    gc.collect()
+                    continue
+
+                # Append CSR components to HDF5 datasets
+                # Append data
+                data_to_append = batch_sparse.data.astype(np.float32)
+                old_len = h5_data.shape[0]
+                new_len = old_len + data_to_append.shape[0]
+                h5_data.resize((new_len,))
+                h5_data[old_len:new_len] = data_to_append
+
+                # Append indices
+                inds_to_append = batch_sparse.indices.astype(np.int32)
+                old_len_i = h5_indices.shape[0]
+                new_len_i = old_len_i + inds_to_append.shape[0]
+                h5_indices.resize((new_len_i,))
+                h5_indices[old_len_i:new_len_i] = inds_to_append
+
+                # Update indptr: append batch indptr[1:] + total_nnz
+                batch_indptr = batch_sparse.indptr.astype(np.int64)
+                to_append_indptr = batch_indptr[1:] + total_nnz
+                old_len_p = h5_indptr.shape[0]
+                new_len_p = old_len_p + to_append_indptr.shape[0]
+                h5_indptr.resize((new_len_p,))
+                h5_indptr[old_len_p:new_len_p] = to_append_indptr
+
+                # Append smiles
+                old_smiles_len = h5_smiles.shape[0]
+                add_smiles = np.array(batch_valid_smiles, dtype='S')
+                h5_smiles.resize((old_smiles_len + add_smiles.shape[0],))
+                # Write as utf-8 strings
+                h5_smiles[old_smiles_len:old_smiles_len + add_smiles.shape[0]] = [s.decode('utf-8') if isinstance(s, bytes) else s for s in add_smiles]
+
+                # Update counters
+                total_rows += batch_sparse.shape[0]
+                total_nnz += batch_sparse.data.shape[0]
+
+                # Free memory for this batch
+                del results, batch_features, batch_valid_smiles, features_dense_batch, batch_sparse, data_to_append, inds_to_append, batch_indptr, to_append_indptr, add_smiles
                 gc.collect()
             
             pbar.close()
-            print(f"\n✅ All done!")
-            print(f"   Total processed: {stats['successful'] + stats['failed']:,}")
-            print(f"   Successful: {stats['successful']:,}")
-            print(f"   Failed: {stats['failed']:,}")
+
+            # Finalize HDF5: write metadata and compute space saved
+            try:
+                # h5_indptr last element is already set; shape for CSR
+                final_shape = (total_rows, cfg.FP_SIZE)
+
+                # CRITICAL: Save shape as dataset (required for loading!)
+                h5f.create_dataset('shape', data=final_shape)
+
+                # Compute sparse size bytes from datasets
+                sparse_bytes = h5_data.size * h5_data.dtype.itemsize + h5_indices.size * h5_indices.dtype.itemsize + h5_indptr.size * h5_indptr.dtype.itemsize
+                sparse_size_gb = sparse_bytes / (1024**3)
+
+                dense_size_gb = (stats['successful'] * cfg.FP_SIZE * 4) / (1024**3)
+                stats['space_saved_percent'] = ((dense_size_gb - sparse_size_gb) / dense_size_gb) * 100 if dense_size_gb > 0 else 0.0
+
+                # Update metadata attributes
+                h5f.attrs['total_molecules'] = stats['successful']
+                h5f.attrs['fp_size'] = cfg.FP_SIZE
+                h5f.attrs['fp_radius'] = cfg.FP_RADIUS
+                h5f.attrs['format'] = 'sparse_csr'
+                h5f.attrs['space_saved_percent'] = stats['space_saved_percent']
+                h5f.attrs['parallel_used'] = stats['parallel_used']
+
+                # Close HDF5 file
+                h5f.close()
+                print(f"\n✅ All done!")
+                print(f"   Total processed: {stats['successful'] + stats['failed']:,}")
+                print(f"   Successful: {stats['successful']:,}")
+                print(f"   Failed: {stats['failed']:,}")
+            except Exception as e:
+                # Ensure file is closed on error
+                try:
+                    h5f.close()
+                except:
+                    pass
+                raise
             
         # ============ SEQUENTIAL FEATURIZATION (FALLBACK) ============
         else:
@@ -655,102 +760,113 @@ def featurize_and_save_to_disk(smiles_list: List[str]) -> Tuple[bool, dict]:
                 except Exception:
                     stats['failed'] += 1
 
-        # ============ VALIDATION ============
+            # ============ VALIDATION (SEQUENTIAL MODE) ============
+            if stats['successful'] == 0:
+                print("\n❌ ERROR: No molecule could be featurized.")
+                cleanup_temp_files(None, cfg.PREDICTION_FEATURIZED_DIR)
+                return False, stats
+            
+            # ============ CONVERT TO SPARSE FORMAT (BATCH-WISE TO AVOID MEMORY ERROR) ============
+            stats['end_time'] = datetime.now()
+            stats['duration'] = stats['end_time'] - stats['start_time']
+            
+            print("\n💾 Saving to disk...")
+            ensure_dir_exists(cfg.PREDICTION_FEATURIZED_DIR)
+            hdf5_path = os.path.join(cfg.PREDICTION_FEATURIZED_DIR, 'featurized_data.h5')
+            
+            
+            try:
+                # Calculate space savings estimate (before processing)
+                dense_size_gb = (stats['successful'] * cfg.FP_SIZE * 4) / (1024**3)  # float32
+                
+                # Process in chunks of max 10K molecules at a time to limit RAM usage
+                SAVE_CHUNK_SIZE = 10000
+                n_save_chunks = (len(all_features) + SAVE_CHUNK_SIZE - 1) // SAVE_CHUNK_SIZE
+                
+                sparse_chunks = []
+                total_sparse_bytes = 0
+                
+                for chunk_idx in range(n_save_chunks):
+                    start_idx = chunk_idx * SAVE_CHUNK_SIZE
+                    end_idx = min(start_idx + SAVE_CHUNK_SIZE, len(all_features))
+                    
+                    # Process this chunk
+                    chunk_features = all_features[start_idx:end_idx]
+                    features_dense_chunk = np.vstack(chunk_features)
+                    sparse_chunk = csr_matrix(features_dense_chunk)
+                    sparse_chunks.append(sparse_chunk)
+                    
+                    total_sparse_bytes += (sparse_chunk.data.nbytes + 
+                                           sparse_chunk.indices.nbytes + 
+                                           sparse_chunk.indptr.nbytes)
+                    
+                    # Free memory immediately
+                    del chunk_features, features_dense_chunk
+                    gc.collect()
+                
+                # Stack all sparse chunks into final sparse matrix
+                all_features_sparse = sparse_vstack(sparse_chunks)
+                del sparse_chunks
+                gc.collect()
+                
+                # Calculate actual space savings
+                sparse_size_gb = total_sparse_bytes / (1024**3)
+                stats['space_saved_percent'] = ((dense_size_gb - sparse_size_gb) / dense_size_gb) * 100
+                
+                
+                # ============ SAVE TO HDF5 WITH COMPRESSION ============
+                with h5py.File(hdf5_path, 'w') as h5f:
+                    # Save sparse matrix components with compression
+                    h5f.create_dataset('data', data=all_features_sparse.data, 
+                                       compression='gzip', compression_opts=9)
+                    h5f.create_dataset('indices', data=all_features_sparse.indices, 
+                                       compression='gzip', compression_opts=9)
+                    h5f.create_dataset('indptr', data=all_features_sparse.indptr, 
+                                       compression='gzip', compression_opts=9)
+                    h5f.create_dataset('shape', data=all_features_sparse.shape)
+                    
+                    # Save SMILES as strings
+                    dt = h5py.string_dtype(encoding='utf-8')
+                    h5f.create_dataset('smiles', data=all_valid_smiles, dtype=dt,
+                                       compression='gzip', compression_opts=9)
+                    
+                    # Save metadata
+                    h5f.attrs['total_molecules'] = stats['successful']
+                    h5f.attrs['fp_size'] = cfg.FP_SIZE
+                    h5f.attrs['fp_radius'] = cfg.FP_RADIUS
+                    h5f.attrs['format'] = 'sparse_csr'
+                    h5f.attrs['space_saved_percent'] = stats['space_saved_percent']
+                    h5f.attrs['parallel_used'] = stats['parallel_used']
+                
+                
+                print(f"\n✅ Featurization completed:")
+                print(f" • Successes: {stats['successful']}")
+                print(f" • Failures: {stats['failed']}")
+                    
+            except MemoryError as mem_err:
+                print(f"\n💥 MEMORY ERROR during save!")
+                print(f"Error: {mem_err}")
+                raise
+            except OSError as disk_err:
+                print(f"\n💾 DISK ERROR during save!")
+                print(f"Error: {disk_err}")
+                print(f"Possible causes: Out of disk space, disk write failure")
+                raise
+
+            # Successful completion (sequential mode)
+            del all_features_sparse, all_valid_smiles
+            gc.collect()
+        
+        # Common validation for both parallel and sequential modes
         if stats['successful'] == 0:
             print("\n❌ ERROR: No molecule could be featurized.")
             cleanup_temp_files(None, cfg.PREDICTION_FEATURIZED_DIR)
             return False, stats
-        
-        # ============ CONVERT TO SPARSE FORMAT (BATCH-WISE TO AVOID MEMORY ERROR) ============
-        stats['end_time'] = datetime.now()
-        stats['duration'] = stats['end_time'] - stats['start_time']
-        
-        print("\n💾 Saving to disk...")
-        ensure_dir_exists(cfg.PREDICTION_FEATURIZED_DIR)
-        hdf5_path = os.path.join(cfg.PREDICTION_FEATURIZED_DIR, 'featurized_data.h5')
-        
-        
-        try:
-            # Calculate space savings estimate (before processing)
-            dense_size_gb = (stats['successful'] * cfg.FP_SIZE * 4) / (1024**3)  # float32
             
-            # Process in chunks of max 10K molecules at a time to limit RAM usage
-            SAVE_CHUNK_SIZE = 10000
-            n_save_chunks = (len(all_features) + SAVE_CHUNK_SIZE - 1) // SAVE_CHUNK_SIZE
-            
-            sparse_chunks = []
-            total_sparse_bytes = 0
-            
-            for chunk_idx in range(n_save_chunks):
-                start_idx = chunk_idx * SAVE_CHUNK_SIZE
-                end_idx = min(start_idx + SAVE_CHUNK_SIZE, len(all_features))
-                
-                # Process this chunk
-                chunk_features = all_features[start_idx:end_idx]
-                features_dense_chunk = np.vstack(chunk_features)
-                sparse_chunk = csr_matrix(features_dense_chunk)
-                sparse_chunks.append(sparse_chunk)
-                
-                total_sparse_bytes += (sparse_chunk.data.nbytes + 
-                                       sparse_chunk.indices.nbytes + 
-                                       sparse_chunk.indptr.nbytes)
-                
-                # Free memory immediately
-                del chunk_features, features_dense_chunk
-                gc.collect()
-            
-            # Stack all sparse chunks into final sparse matrix
-            all_features_sparse = sparse_vstack(sparse_chunks)
-            del sparse_chunks
-            gc.collect()
-            
-            # Calculate actual space savings
-            sparse_size_gb = total_sparse_bytes / (1024**3)
-            stats['space_saved_percent'] = ((dense_size_gb - sparse_size_gb) / dense_size_gb) * 100
-            
-            
-            # ============ SAVE TO HDF5 WITH COMPRESSION ============
-            with h5py.File(hdf5_path, 'w') as h5f:
-                # Save sparse matrix components with compression
-                h5f.create_dataset('data', data=all_features_sparse.data, 
-                                   compression='gzip', compression_opts=9)
-                h5f.create_dataset('indices', data=all_features_sparse.indices, 
-                                   compression='gzip', compression_opts=9)
-                h5f.create_dataset('indptr', data=all_features_sparse.indptr, 
-                                   compression='gzip', compression_opts=9)
-                h5f.create_dataset('shape', data=all_features_sparse.shape)
-                
-                # Save SMILES as strings
-                dt = h5py.string_dtype(encoding='utf-8')
-                h5f.create_dataset('smiles', data=all_valid_smiles, dtype=dt,
-                                   compression='gzip', compression_opts=9)
-                
-                # Save metadata
-                h5f.attrs['total_molecules'] = stats['successful']
-                h5f.attrs['fp_size'] = cfg.FP_SIZE
-                h5f.attrs['fp_radius'] = cfg.FP_RADIUS
-                h5f.attrs['format'] = 'sparse_csr'
-                h5f.attrs['space_saved_percent'] = stats['space_saved_percent']
-                h5f.attrs['parallel_used'] = stats['parallel_used']
-            
-            
-            print(f"\n✅ Featurization completed:")
-            print(f" • Successes: {stats['successful']}")
-            print(f" • Failures: {stats['failed']}")
-                
-        except MemoryError as mem_err:
-            print(f"\n💥 MEMORY ERROR during save!")
-            print(f"Error: {mem_err}")
-            raise
-        except OSError as disk_err:
-            print(f"\n💾 DISK ERROR during save!")
-            print(f"Error: {disk_err}")
-            print(f"Possible causes: Out of disk space, disk write failure")
-            raise
-
-        # Successful completion
-        del all_features_sparse, all_valid_smiles
-        gc.collect()
+        # Set end time if not already set
+        if 'end_time' not in stats:
+            stats['end_time'] = datetime.now()
+            stats['duration'] = stats['end_time'] - stats['start_time']
         
         return True, stats
         

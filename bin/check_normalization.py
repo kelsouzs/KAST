@@ -31,7 +31,7 @@ RDLogger.DisableLog('rdApp.*')
 
 from utils import load_smiles_from_file, normalize_molecule
 import settings as cfg
-from main import display_splash_screen
+
 
 def analyze_normalization(filepath: str) -> Dict:
     """
@@ -242,6 +242,7 @@ def check_all_data_files():
 
 def main():
     """Main function."""
+    from main import display_splash_screen
     display_splash_screen()
     print("\n" + "="*70)
     print(" 🧪 K-TALYSTICFLOW - MOLECULAR NORMALIZATION CHECKER")
@@ -275,4 +276,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

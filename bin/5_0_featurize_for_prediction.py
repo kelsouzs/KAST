@@ -236,6 +236,12 @@ def check_disk_space(required_gb: float) -> bool:
     """Check if there's enough disk space available."""
     try:
         import psutil
+    except (ImportError, ModuleNotFoundError):
+        print("\n⚠️ Cannot check disk space (psutil not installed)")
+        print("   Proceeding anyway...")
+        return True
+    
+    try:
         disk_usage = psutil.disk_usage(os.path.dirname(cfg.PREDICTION_FEATURIZED_DIR))
         available_gb = disk_usage.free / (1024**3)
         
@@ -253,10 +259,6 @@ def check_disk_space(required_gb: float) -> bool:
         else:
             print(f"✅ Sufficient space available")
         
-        return True
-    except ImportError:
-        print("\n⚠️ Cannot check disk space (psutil not installed)")
-        print("   Proceeding anyway...")
         return True
     except Exception as e:
         print(f"\n⚠️ Error checking disk space: {e}")

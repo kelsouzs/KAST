@@ -4,7 +4,6 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Status](https://img.shields.io/badge/Status-In%20Development-orange.svg)
 ![DOI](https://img.shields.io/badge/DOI-coming%20soon-lightgrey.svg)
-[![Documentation](https://img.shields.io/badge/Docs-here-8A2BE2)](https://lmm.uefs.br/wp-content/uploads/2025/10/KAST-Documentation.html)
 [![LinkedIn](https://img.shields.io/badge/-LinkedIn-blue?style=flat-square&logo=linkedin&logoColor=white&link=https://www.linkedin.com/in/kelsouzs)](https://www.linkedin.com/in/kelsouzs)
 [![GitHub](https://img.shields.io/badge/-GitHub-181717?style=flat-square&logo=github&logoColor=white&link=https://github.com/kelsouzs)](https://github.com/kelsouzs)
 
@@ -402,6 +401,6 @@ Pull requests welcome! For major changes, open an issue first to discuss.
 ## 📬 Contact
 
 Questions or suggestions?  
-Open an [issue](https://github.com/kelsouzs/KAST/issues) or email [kelsouzs.uefs@gmail.com](mailto:kelsouzs.uefs@gmail.com)
+Open an [issue](https://github.com/kelsouzs/KAST/issues) or email [lmm@uefs.br](mailto:lmm@uefs.br)
 
 ---

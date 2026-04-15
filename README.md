@@ -2,8 +2,10 @@
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Status](https://img.shields.io/badge/Status-In%20Development-orange.svg)
+![Version](https://img.shields.io/badge/Version-1.0.0-green.svg)
+![Status](https://img.shields.io/badge/Status-Stable-brightgreen.svg)
 ![DOI](https://img.shields.io/badge/DOI-coming%20soon-lightgrey.svg)
+[![Documentation](https://img.shields.io/badge/Docs-here-8A2BE2)](https://lmm.uefs.br/wp-content/uploads/2025/10/KAST-Documentation.html)
 [![LinkedIn](https://img.shields.io/badge/-LinkedIn-blue?style=flat-square&logo=linkedin&logoColor=white&link=https://www.linkedin.com/in/kelsouzs)](https://www.linkedin.com/in/kelsouzs)
 [![GitHub](https://img.shields.io/badge/-GitHub-181717?style=flat-square&logo=github&logoColor=white&link=https://github.com/kelsouzs)](https://github.com/kelsouzs)
 
@@ -22,7 +24,7 @@
 K-talysticFlow is a fully automated, interactive pipeline for training, evaluating, and using Deep Learning models to predict molecular bioactivity.  
 Built for virtual screening and rapid identification of promising chemical compounds — accelerating drug discovery.
 
-**Current Version: 1.0.0** (Under Development)
+**Current Version: 1.0.0** (Stable Release - October 10, 2025)
 
 Developed at the [Laboratory of Molecular Modeling (LMM-UEFS)](https://lmm.uefs.br/), funded by CNPq.
 

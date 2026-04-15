@@ -2,13 +2,15 @@
 tensorflow
 torch
 deepchem
-pytorch-lightning 
+pytorch-lightning  
 jax  
 
 # Data Processing
 pandas
 numpy
 scikit-learn
+scipy
+h5py
 
 # Visualization
 matplotlib
@@ -19,10 +21,12 @@ tqdm
 # Model Serialization
 joblib
 
+# System/Utilities
+psutil
+
+# Documentation
+markdown2
+
 # Chemistry (requires conda - see installation instructions below)
 # RDKit cannot be installed via pip. Use: conda install -c conda-forge rdkit
-
 # rdkit
-
-# Testing
-pytest

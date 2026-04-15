@@ -91,4 +91,4 @@ def check_dependencies():
 
 if __name__ == "__main__":
     all_ok = check_dependencies()
-    sys.exit(0 if all_ok else 1) # Returns 0 for success, 1 for error
+    sys.exit(0 if all_ok else 1) # Returns 0 for success, 1 for error 

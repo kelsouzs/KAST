@@ -497,4 +497,4 @@ def log_error(logger, error_msg: str, exception: Exception = None):
     if exception:
         logger.error(f"{error_msg}: {str(exception)}", exc_info=True)
     else:
-        logger.error(error_msg)
+        logger.error(error_msg) 

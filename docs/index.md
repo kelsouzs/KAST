@@ -1,17 +1,61 @@
-```{raw} html
-<div style="text-align: center; padding: 2.5rem 0 1.5rem 0;">
-  <img src="_static/kast_logo.png" alt="KAST Logo" width="150" style="margin-bottom: 1.2rem; display: block; margin-left: auto; margin-right: auto;"/>
-  <h1 style="font-size: 2.4rem; margin: 0; color: #2c2c2c;">K-talysticFlow (KAST)</h1>
-  <p style="font-size: 1.05rem; color: #666; margin-top: 0.6rem; max-width: 600px; margin-left: auto; margin-right: auto;">
-    <strong>K</strong>-atalystic <strong>A</strong>utomated <strong>S</strong>creening
-    <strong>T</strong>askflow — Automated Deep Learning for Molecular Bioactivity Prediction
-  </p>
-  <hr style="margin: 1.8rem auto; width: 50%; border: none; border-top: 2px solid #9c7aff;"/>
-</div>
+## What is KAST?
+
+K-talysticFlow (KAST) is an open-source pipeline that democratizes the use of deep learning
+for molecular bioactivity prediction in drug discovery and virtual screening workflows.
+KAST was developed at the Laboratory of Molecular Modeling (LMM-UEFS) to provide
+researchers with a reproducible, end-to-end solution — from data preparation to prediction —
+without requiring deep expertise in machine learning infrastructure.
+
+The pipeline is built on [DeepChem](https://github.com/deepchem/deepchem) and TensorFlow,
+using Morgan/ECFP fingerprints as molecular descriptors and a MultitaskClassifier neural
+network trained from scratch on user-provided bioactivity data.
+
+What can you use KAST for? Here are some examples:
+
+- Predict the bioactivity of small drug-like molecules against a biological target
+- Rank large compound libraries by predicted probability of activity
+- Train a custom deep learning model using your own active/inactive dataset
+- Evaluate model quality with ROC-AUC, enrichment factor, and cross-validation
+- Export ranked candidate lists for downstream experimental validation
+
+KAST is a machine learning training and inference tool — it learns from your data and
+builds a target-specific model. It does not ship with pre-trained models for arbitrary targets.
+
+***
+
+## Quick Start
+
+The fastest way to get started is to set up the Conda environment and launch the interactive menu:
+
+```bash
+conda env create -f environment.yml
+conda activate kast
+python main.py
 ```
 
+Then follow the step-by-step pipeline:
+
+```
+[1] Prepare Data       → Clean and organize your SMILES dataset
+[2] Featurize          → Generate Morgan/ECFP fingerprints
+[3] Train Model        → Build your deep learning model from scratch
+[4] Evaluate           → ROC-AUC, cross-validation, enrichment factor
+[5] Predict            → Screen new molecules and export ranked results
+```
+
+***
+
+## About
+
+KAST is developed and maintained at the
+[Laboratory of Molecular Modeling (LMM-UEFS)](https://lmm.uefs.br/) by Késsia Souza Santos.
+Contributions, issues, and suggestions are welcome via the
+[GitHub repository](https://github.com/kelsouzs/KAST).
+
+***
+
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 1
 :caption: Getting Started
 
 getting-started/overview
@@ -20,7 +64,7 @@ getting-started/quick-start
 ```
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 1
 :caption: User Guide
 
 user-guide/pipeline
@@ -31,19 +75,10 @@ user-guide/outputs
 ```
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 1
 :caption: Support
 
 support/faq
 support/troubleshooting
 support/configuration
 ```
-
-## Key Features
-
-- **Interactive Menu** — Easy step-by-step workflow
-- **Parallel Processing** — 5-10x faster on large datasets
-- **Deep Learning** — DeepChem + TensorFlow neural networks
-- **K-Prediction Score** — Proprietary scoring for molecular ranking
-- **Full Validation** — ROC/AUC, Cross-Val, Enrichment Factor
-- **One-Click Setup** — Automated for Windows and Linux

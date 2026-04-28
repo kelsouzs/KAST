@@ -21,8 +21,5 @@ joblib==1.5.1
 # System/Utilities
 psutil==7.0.0
 
-# Documentation
-markdown2
-
 # NOTE: RDKit cannot be installed via pip
 # Install via conda instead: conda install -c conda-forge rdkit

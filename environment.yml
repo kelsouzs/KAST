@@ -47,9 +47,6 @@ dependencies:
     
     # Chemistry & Machine Learning
     - deepchem==2.8.0
-    
-    # Documentation
-    - markdown2
 
 # Notes for different platforms:
 # - Windows: All packages are pre-built and compatible

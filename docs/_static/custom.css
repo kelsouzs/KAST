@@ -1,0 +1,21 @@
+/* Controla tamanho de emojis em headings */
+h1, h2, h3 {
+    font-size: revert;
+}
+
+h1 img, h2 img, h3 img,
+h1 .emoji, h2 .emoji, h3 .emoji {
+    font-size: 1rem !important;
+    vertical-align: middle;
+}
+
+/* Tipografia igual ao DeepChem */
+body {
+    font-family: Lato, proxima-nova, Helvetica Neue, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.wy-nav-content {
+    max-width: 800px;
+}

@@ -43,7 +43,7 @@ dependencies:
   # These work across all platforms
   - pip:
     # Deep Learning Frameworks
-    - tensorflow==2.19.0
+    - tensorflow==2.18.0
     
     # Chemistry & Machine Learning
     - deepchem==2.8.0

@@ -587,9 +587,7 @@ def display_menu():
     print("  [3] Create and Train the Model")
     print("  [4] Evaluate the Model")
     print("  [5] Predict Activity of New Molecules")
-    print("\n--------------------- FULL FLOW -------------------------")
-    print("\n  [6] Run Full Pipeline (Options 1 to 4)")
-    print("\n---------------------------------------------------------")
+
     print("\n  [8] Advanced Options (Testing & Configuration)")
     print("  [9] About & How to Cite")
     print("  [0] Exit Program")
@@ -618,7 +616,6 @@ def run_interactive_menu():
             '3': step_3_training,
             '4': step_4_evaluation_menu,
             '5': step_5_prediction_menu,
-            '6': run_full_pipeline,
             '8': advanced_options_menu,
             '9': show_credits,
         }

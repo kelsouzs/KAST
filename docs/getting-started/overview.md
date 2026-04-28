@@ -97,3 +97,5 @@ KAST is built upon foundational principles of chemoinformatics and machine learn
 - **Molecular Fingerprints (ECFP):** Rogers, D., & Hahn, M. (2010). Extended-Connectivity Fingerprints. *Journal of Chemical Information and Modeling*, 50(5), 742-754. [doi:10.1021/ci100050t](https://doi.org/10.1021/ci100050t)
 - **Deep Learning in Drug Discovery:** Ramsundar, B., et al. (2019). *Deep Learning for the Life Sciences: Applying Deep Learning to Genomics, Microscopy, Drug Discovery, and More*. O'Reilly Media.
 - **Imbalanced Learning in Chemistry:** Jiang, J., et al. (2025). A review of machine learning methods for imbalanced data challenges in chemistry. *Chemical Science*, 16, 7637–7658. [doi:10.1039/D5SC00270B](https://doi.org/10.1039/D5SC00270B)
+
+---

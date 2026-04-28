@@ -153,8 +153,6 @@ CC1=CC=CC=C1                        0.45     Inactive
 CCc1ccccc1O                         0.78     Active
 ```
 
----
-
 ## 🎯 You're Done!
 
 You've completed:

@@ -38,7 +38,8 @@ def test_parallel_config(cfg):
     for var, expected_type in required_vars:
         if hasattr(cfg, var):
             value = getattr(cfg, var)
-            print(f"  {var:<40} = {value:<20} {GREEN}[OK]{RESET}")
+            value_str = str(value) if value is not None else "None"
+            print(f"  {var:<40} = {value_str:<20} {GREEN}[OK]{RESET}")
         else:
             print(f"  {var:<40} {RED}[MISSING]{RESET}")
             all_ok = False

@@ -1,7 +1,7 @@
 ```{raw} html
 <div style="text-align: center; padding: 2.5rem 0 1.5rem 0;">
   <h1 style="font-size: 2.2rem; margin: 0;">K-talysticFlow (KAST)</h1>
-  <p style="font-size: 1.1rem; color: #666; margin-top: 0.5rem;">
+  <p style="font-size: 1.1rem; color: #000000; margin-top: 0.5rem;">
     <strong>K</strong>-atalystic <strong>A</strong>utomated <strong>S</strong>creening
     <strong>T</strong>askflow — Automated Deep Learning for Molecular Bioactivity Prediction
   </p>

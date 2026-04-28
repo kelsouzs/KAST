@@ -1,43 +1,21 @@
-# Configuration file for Sphinx documentation builder
-# https://www.sphinx-doc.org/en/master/usage/configuration.html
-
 # -- Project information
 project = 'K-talysticFlow (KAST)'
 copyright = '2025, Laboratory of Molecular Modeling (LMM-UEFS)'
 author = 'Késsia Souza Santos'
 release = '1.0.0'
 
-# -- General configuration
+# -- Extensions
 extensions = [
-    'myst_parser',           # substitui sphinx_md
+    'myst_parser',
     'sphinx.ext.mathjax',
 ]
 
 source_suffix = {
     '.rst': 'restructuredtext',
-    '.md': 'myst',           # myst processa os .md agora
+    '.md': 'myst',
 }
 
-# -- HTML output
-html_theme = 'alabaster'
-html_theme_options = {
-    'logo': '',
-    'description': 'Automated Deep Learning Pipeline for Molecular Bioactivity Prediction',
-    'github_user': 'kelsouzs',
-    'github_repo': 'KAST',
-    'github_button': True,
-    'github_type': 'star',
-    'sidebar_width': '250px',
-}
-
-html_static_path = []
-html_logo = None
-
-# -- Read the Docs
-master_doc = 'index'
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-
-# -- MyST Markdown extensions
+# -- MyST
 myst_enable_extensions = [
     "colon_fence",
     "tasklist",
@@ -45,5 +23,22 @@ myst_enable_extensions = [
     "amsmath",
 ]
 
-# -- Language
+# -- HTML
+html_theme = 'sphinx_rtd_theme'
+
+html_theme_options = {
+    'logo_only': True,
+    'navigation_depth': 4,
+    'collapse_navigation': False,
+    'sticky_navigation': True,
+    'prev_next_buttons_location': 'both',
+    'style_nav_header_background': '#9c7aff',  # roxo KAST
+}
+
+html_logo = '_static/kast_logo.png'
+html_static_path = ['_static']
+
+# -- Read the Docs
+master_doc = 'index'
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 language = 'en'

@@ -8,10 +8,10 @@ build:
 
 python:
   install:
-    - requirements: docs_new/requirements-docs.txt
+    - requirements: docs/requirements-docs.txt
 
 sphinx:
-  configuration: docs_new/conf.py
+  configuration: docs/conf.py
   fail_on_warning: false
 
 formats:

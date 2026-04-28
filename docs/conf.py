@@ -9,13 +9,13 @@ release = '1.0.0'
 
 # -- General configuration
 extensions = [
-    'sphinx_md',
+    'myst_parser',           # substitui sphinx_md
     'sphinx.ext.mathjax',
 ]
 
 source_suffix = {
-    '.rst': None,
-    '.md': 'markdown',
+    '.rst': 'restructuredtext',
+    '.md': 'myst',           # myst processa os .md agora
 }
 
 # -- HTML output

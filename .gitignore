@@ -22,6 +22,7 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+*.bat
 
 # Results and outputs
 results/

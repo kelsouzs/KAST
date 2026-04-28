@@ -1,0 +1,61 @@
+# KAST Environment Configuration
+# Compatible with Windows, Linux, and macOS
+# Build with: conda env create -f environment.yml
+# Update: conda env update -f environment.yml --prune
+# Activate: conda activate ktalysticflow
+# Deactivate: conda deactivate
+
+name: ktalysticflow
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  # Python version - compatible with Windows, Linux, macOS
+  - python=3.9
+
+  # Chemistry - RDKit (must use conda-forge for cross-platform compatibility)
+  - rdkit
+
+  # Data Processing - cross-platform packages
+  - pandas=2.3.1
+  - numpy=2.0.2
+  - scikit-learn
+  - scipy=1.13.1
+  - h5py=3.14.0
+
+  # Visualization
+  - matplotlib=3.9.4
+
+  # Progress bars
+  - tqdm=4.67.1
+
+  # Model Serialization
+  - joblib=1.5.1
+
+  # System/Utilities
+  - psutil=7.0.0
+
+  # Pip for additional packages
+  - pip
+
+  # Pip packages (installed after conda packages)
+  # These work across all platforms
+  - pip:
+    # Deep Learning Frameworks
+    - tensorflow==2.19.0
+    - torch==2.5.1
+    - pytorch-lightning==2.5.5
+    
+    # Chemistry & Machine Learning
+    - deepchem==2.8.0
+    - jax==0.4.30
+    
+    # Documentation
+    - markdown2
+
+# Notes for different platforms:
+# - Windows: All packages are pre-built and compatible
+# - Linux: May require build tools (gcc, g++, make) - install with: sudo apt-get install build-essential
+# - macOS: Xcode Command Line Tools may be required - install with: xcode-select --install
+

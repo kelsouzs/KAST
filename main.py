@@ -337,7 +337,6 @@ def step_5_prediction_menu():
         print_menu_header("Submenu [5] - Predict New Molecules")
         print("\n  [1] Only Featurize (Prepare dataset)")
         print("  [2] Only Predict (Use existing dataset)")
-        print("  [3] Full Flow (Featurize + Predict)")
         print("\n  [0] Return to Main Menu")
         print(SEPARATOR)
         
@@ -364,20 +363,6 @@ def step_5_prediction_menu():
                 print("❌ Prediction error.")
             input("\nPress Enter to continue...")
                 
-        elif prediction_choice == '3':
-            print("\n🔄 Running full flow...")
-            result1 = run_script("5_0_featurize_for_prediction.py")
-            if not result1:
-                print("❌ Featurization error. Aborting flow.")
-            else:
-                print("\n✅ Step completed!")
-                result2 = run_script("5_1_run_prediction.py")
-                if result2:
-                    print("\n✅ Full flow completed successfully!")
-                else:
-                    print("❌ Prediction error.")
-            input("\nPress Enter to continue...")
-                    
         elif prediction_choice == '0':
             break
         else:

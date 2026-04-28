@@ -1,8 +1,8 @@
 import sys
 import os
 
-# Add project root to path
-project_root = os.path.abspath(os.path.dirname(__file__))
+# Add project root to path (go up one level from bin/)
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
@@ -123,16 +123,16 @@ def test_script_compatibility():
     print("="*70)
     
     scripts = [
-        'bin/2_featurization.py',
-        'bin/5_0_featurize_for_prediction.py',
-        'bin/5_1_run_prediction.py',
-        'bin/4_1_cross_validation.py',
-        'bin/4_3_tanimoto_similarity.py',
+        '2_featurization.py',
+        '5_0_featurize_for_prediction.py',
+        '5_1_run_prediction.py',
+        '4_1_cross_validation.py',
+        '4_3_tanimoto_similarity.py',
     ]
     
     all_ok = True
     for script in scripts:
-        script_path = os.path.join(project_root, script)
+        script_path = os.path.join(project_root, 'bin', script)
         if os.path.exists(script_path):
             # Check if script has required imports
             with open(script_path, 'r', encoding='utf-8') as f:
@@ -143,12 +143,12 @@ def test_script_compatibility():
             has_parallel_check = 'cfg.ENABLE_PARALLEL_PROCESSING' in content
             
             if has_cfg_import and has_get_optimal and has_parallel_check:
-                print(f"✅ {script}")
+                print(f"✅ bin/{script}")
                 print(f"   • imports settings ✓")
                 print(f"   • has get_optimal_workers() ✓")
                 print(f"   • checks ENABLE_PARALLEL_PROCESSING ✓")
             else:
-                print(f"⚠️  {script}")
+                print(f"⚠️  bin/{script}")
                 if not has_cfg_import:
                     print(f"   • missing 'import settings as cfg'")
                 if not has_get_optimal:
@@ -157,7 +157,7 @@ def test_script_compatibility():
                     print(f"   • missing ENABLE_PARALLEL_PROCESSING check")
                 all_ok = False
         else:
-            print(f"❌ {script} - File not found")
+            print(f"❌ bin/{script} - File not found")
             all_ok = False
     
     return all_ok

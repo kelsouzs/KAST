@@ -4,7 +4,7 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Version](https://img.shields.io/badge/Version-1.0.0-green.svg)
 ![Status](https://img.shields.io/badge/Status-Stable-brightgreen.svg)
-[![Documentation](https://img.shields.io/badge/Docs-here-8A2BE2)](https://lmm.uefs.br/wp-content/uploads/2025/10/KAST-Documentation.html)
+[![Documentation](https://img.shields.io/badge/Docs-here-8A2BE2)](https://kast.readthedocs.io/en/latest/)
 [![LinkedIn](https://img.shields.io/badge/-LinkedIn-blue?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/kelsouzs)
 [![GitHub](https://img.shields.io/badge/-GitHub-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/kelsouzs)
 
@@ -256,7 +256,7 @@ A: Yes! Edit `settings.py` anytime or use menu option `[8]→[3]` for interactiv
 
 ## 🔗 Links
 
-- 📘 **[Full Documentation](https://lmm.uefs.br/wp-content/uploads/2025/10/KAST-Documentation.html)**
+- 📘 **[Full Documentation](https://kast.readthedocs.io/en/latest/)**
 - 👤 **[LinkedIn](https://www.linkedin.com/in/kelsouzs)**
 - 💻 **[GitHub Profile](https://github.com/kelsouzs)**
 - 🏫 **[LMM Laboratory](https://lmm.uefs.br/)**

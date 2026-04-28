@@ -19,7 +19,7 @@ dependencies:
 
   # Data Processing - cross-platform packages
   - pandas=2.3.1
-  - numpy=2.0.2
+  - numpy=1.26.4
   - scikit-learn
   - scipy=1.13.1
   - h5py=3.14.0
@@ -44,12 +44,9 @@ dependencies:
   - pip:
     # Deep Learning Frameworks
     - tensorflow==2.19.0
-    - torch==2.5.1
-    - pytorch-lightning==2.5.5
     
     # Chemistry & Machine Learning
     - deepchem==2.8.0
-    - jax==0.4.30
     
     # Documentation
     - markdown2

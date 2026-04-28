@@ -1,32 +1,28 @@
 # Deep Learning Framework
-tensorflow
-torch
-deepchem
-pytorch-lightning  
-jax  
+tensorflow==2.19.0
+deepchem==2.8.0
 
 # Data Processing
-pandas
-numpy
+pandas==2.3.1
+numpy==1.26.4
 scikit-learn
-scipy
-h5py
+scipy==1.13.1
+h5py==3.14.0
 
 # Visualization
-matplotlib
+matplotlib==3.9.4
 
 # Progress Bars
-tqdm
+tqdm==4.67.1
 
 # Model Serialization
-joblib
+joblib==1.5.1
 
 # System/Utilities
-psutil
+psutil==7.0.0
 
 # Documentation
 markdown2
 
-# Chemistry (requires conda - see installation instructions below)
-# RDKit cannot be installed via pip. Use: conda install -c conda-forge rdkit
-# rdkit
+# NOTE: RDKit cannot be installed via pip
+# Install via conda instead: conda install -c conda-forge rdkit

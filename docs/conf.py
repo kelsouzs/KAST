@@ -44,3 +44,4 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 language = 'en'
 
 html_css_files = ['custom.css']
+html_static_path = ['_static']

@@ -1,4 +1,4 @@
-# 🚀 K-talysticFlow (KAST) Documentation
+#  K-talysticFlow (KAST) Documentation
 
 **K**-atalystic **A**utomated **S**creening **T**askflow — Automated Deep Learning for Molecular Bioactivity Prediction
 
@@ -33,11 +33,11 @@ support/troubleshooting
 support/configuration
 ```
 
-## ✨ Key Features
+## Key Features
 
-- ⚡ **Interactive Menu** — Easy step-by-step workflow
-- 🚀 **Parallel Processing** — 5-10x faster on large datasets
-- 🧠 **Deep Learning** — DeepChem + TensorFlow neural networks
-- 🎯 **K-Prediction Score** — Proprietary scoring for molecular ranking
-- 🧪 **Full Validation** — ROC/AUC, Cross-Val, Enrichment Factor
-- 🖥️ **One-Click Setup** — Automated for Windows and Linux
+-  **Interactive Menu** — Easy step-by-step workflow
+-  **Parallel Processing** — 5-10x faster on large datasets
+-  **Deep Learning** — DeepChem + TensorFlow neural networks
+-  **K-Prediction Score** — Proprietary scoring for molecular ranking
+-  **Full Validation** — ROC/AUC, Cross-Val, Enrichment Factor
+-  **One-Click Setup** — Automated for Windows and Linux

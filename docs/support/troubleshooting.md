@@ -197,17 +197,6 @@ conda install -c conda-forge rdkit
 
 ---
 
-### "GPU/CUDA not found" warning
-
-**This is normal!** KAST works fine on CPU only.
-
-**If you want GPU support** (advanced):
-```bash
-conda install tensorflow-gpu=2.13
-```
-
----
-
 ### Featurization is very slow
 
 **Solutions:**
@@ -327,7 +316,7 @@ EOF
 - Include: OS, error message, steps to reproduce
 
 ### Email support:
-- kelsouzs.uefs@gmail.com
+- lmm@uefs.br
 - Include: Full error output, log file, dataset info if possible
 
 ---

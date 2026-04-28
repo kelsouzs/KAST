@@ -4,10 +4,9 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Version](https://img.shields.io/badge/Version-1.0.0-green.svg)
 ![Status](https://img.shields.io/badge/Status-Stable-brightgreen.svg)
-![DOI](https://img.shields.io/badge/DOI-coming%20soon-lightgrey.svg)
 [![Documentation](https://img.shields.io/badge/Docs-here-8A2BE2)](https://lmm.uefs.br/wp-content/uploads/2025/10/KAST-Documentation.html)
-[![LinkedIn](https://img.shields.io/badge/-LinkedIn-blue?style=flat-square&logo=linkedin&logoColor=white&link=https://www.linkedin.com/in/kelsouzs)](https://www.linkedin.com/in/kelsouzs)
-[![GitHub](https://img.shields.io/badge/-GitHub-181717?style=flat-square&logo=github&logoColor=white&link=https://github.com/kelsouzs)](https://github.com/kelsouzs)
+[![LinkedIn](https://img.shields.io/badge/-LinkedIn-blue?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/kelsouzs)
+[![GitHub](https://img.shields.io/badge/-GitHub-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/kelsouzs)
 
 ```
   __  __    _     ____  _____ 
@@ -19,390 +18,264 @@
 
 ---
 
-## 👨‍🔬 What is K-talysticFlow (KAST)?
+## 👨‍🔬 What is K-talysticFlow?
 
-K-talysticFlow is a fully automated, interactive pipeline for training, evaluating, and using Deep Learning models to predict molecular bioactivity.  
-Built for virtual screening and rapid identification of promising chemical compounds — accelerating drug discovery.
+K-talysticFlow is an automated, interactive pipeline for training and using Deep Learning models to predict molecular bioactivity. Perfect for virtual screening and rapid identification of promising chemical compounds.
 
-**Current Version: 1.0.0** (Stable Release - October 10, 2025)
-
-Developed at the [Laboratory of Molecular Modeling (LMM-UEFS)](https://lmm.uefs.br/), funded by CNPq.
+**Version:** 1.0.0 (Stable)  
+**Developed at:** [Laboratory of Molecular Modeling (LMM-UEFS)](https://lmm.uefs.br/) — Funded by CNPq
 
 ---
 
-## ✨ Features at a Glance
+## ✨ Features
 
-- ⚡ **Automated CLI Workflow:** Interactive menu with progress bars and modular scripts
-- 🚀 **Parallel Processing:** Multi-core support for 5-10x faster featurization and prediction
-- 🧠 **Deep Learning Model:** Neural network (DeepChem/Tensorflow) learns molecular fingerprints (ECFP/Morgan)
-- 🎯 **K-Prediction Score:** Proprietary scoring system for ranking molecular activity predictions
-- 🧪 **Scientific Validation:** Full suite: ROC/AUC, Cross-Validation, Enrichment Factor, Tanimoto Similarity, Learning Curve
-- 📊 **Rich Outputs:** Reports, CSVs, and publication-ready plots
-- 🔄 **Reproducibility:** Environment checker, logging, config management
-- 🖥️ **User-Friendly:** Step-by-step guidance, clean folder structure, error handling
+- ⚡ **Interactive CLI Menu** — Easy step-by-step workflow
+- 🚀 **Parallel Processing** — 5-10x faster with multi-core support
+- 🧠 **Deep Learning** — DeepChem/TensorFlow neural networks
+- 🎯 **K-Prediction Score** — Proprietary ranking for predictions
+- 🧪 **Validation Suite** — ROC/AUC, Cross-Validation, Enrichment Factor, Similarity
+- 🖥️ **One-Click Setup** — Automated environment creation for Windows and Linux
 
 ---
 
-## 📁 Project Structure
+## 📁 Folder Structure
 
 ```
 KAST/
-├── 🧩 bin/                # Pipeline scripts
-│   ├── ⚙️ 1_preparation.py           # Data split
-│   ├── 🦾 2_featurization.py         # Fingerprinting
-│   ├── 🤖 3_create_training.py       # Model creation and training
-│   ├── 📊 4_0_evaluation_main.py     # Main evaluation
-│   ├── 🧪 ... (other evaluation scripts)
-│   └── 🔮 5_1_run_prediction.py      # Prediction for new molecules
-├── 🧬 data/              # Input data (.smi files)
-│   └── 🧪 xx.smi
-├── 📦 results/         # Outputs, logs, models, plots
-├── 📝 settings.py           # Pipeline settings
-├── 🛠️ utils.py            # Shared functions
-├── 🖥️ main.py             # Interactive menu
-├── 📄 requirements.txt    # Python requirements
-├── � CHANGELOG.md        # Version history
-├── �📜 LICENSE             # MIT License
-├── 📚 README.md           # This file
+├── bin/                    # Pipeline scripts (1-5)
+├── data/                   # Input SMILES files (.smi)
+├── results/                # Outputs (logs, models, reports)
+├── settings.py             # Configuration & parallel processing
+├── main.py                 # Interactive menu
+├── setup.exe               # Windows automated setup
+├── setup.sh                # Linux setup script
+└── README.md               # This file
 ```
 
 ---
 
-## ⚙️ System Requirements
+## ⚙️ Requirements
 
-- **Python**: 3.9+ (tested)
-- **Conda**: Recommended for RDKit and isolation
-- **Main packages**: RDKit, DeepChem, Tensorflow, Scikit-learn, pandas, numpy, tqdm, matplotlib, joblib (for parallel processing)
-- **CPU**: Multi-core processor recommended for parallel processing (optional but highly recommended)
+- **Python:** 3.9+
+- **Conda:** Required for environment setup
+- **Main packages:** RDKit, DeepChem, TensorFlow, scikit-learn, pandas, numpy, joblib
+- **RAM:** 4GB+ (8GB+ recommended for parallel processing)
 
 ---
 
-## 🚀 Parallel Processing Configuration 
+## 🚀 Installation
 
-K-talysticFlow supports **multi-core parallel processing** for significant performance improvements on large datasets!
+### 📦 Windows Users (Easiest Option!)
 
-### ⚡ Performance Gains
-- **5-10x faster** featurization on datasets with 100K+ molecules
-- Automatic CPU detection and optimization
-- Memory-efficient batch processing
+**Using `setup.exe` (Fully Automated)**
 
-### ⚙️ Configuration
+```
+1. Download setup.exe from releases
+2. Double-click setup.exe in the KAST folder
+3. The installer will:
+   ✅ Find your Conda installation automatically
+   ✅ Create environment 'ktalysticflow' (or update if exists)
+   ✅ Install all dependencies
+   ✅ Create desktop + Start Menu shortcuts
+   ✅ Generate run_kast.bat launcher
+4. Click the desktop shortcut to launch KAST!
+```
 
-Edit `settings.py` to customize parallel processing:
+**What does `setup.exe` do?**
+- **Locates Conda**: Searches standard installation paths (Anaconda3, miniconda3, mambaforge, Program Files, registry)
+- **Environment Setup**: Creates or updates the `ktalysticflow` conda environment from `environment.yml`
+- **Creates Launcher**: Generates `run_kast.bat` that automatically activates conda and launches KAST
+- **Creates Shortcuts**: Desktop and Start Menu shortcuts that run KAST with one click
+- **No Terminal Needed**: Runs KAST directly without opening Anaconda Prompt or PowerShell
+
+**Quick Launch After Setup:**
+- Click desktop shortcut "K-talysticFlow 1.0.0"
+- Or: Double-click `run_kast.bat` in the folder
+- Or: Start Menu → K-talysticFlow 1.0.0
+
+---
+
+### 🐧 Linux Users
+
+**Using `setup.sh` (Fully Automated)**
+
+```bash
+# Make script executable
+chmod +x setup.sh
+
+# Run setup
+./setup.sh
+```
+
+**What does `setup.sh` do?**
+- **Checks Conda**: Verifies Conda is installed
+- **Creates Environment**: Builds `ktalysticflow` environment from `environment.yml`
+- **Installs Dependencies**: All required packages automatically
+
+**After Setup:**
+```bash
+# Activate environment
+conda activate ktalysticflow
+
+# Launch KAST
+python main.py
+```
+
+---
+
+### 🛠️ Manual Setup (All Platforms)
+
+```bash
+# Create environment from file
+conda env create -f environment.yml -y
+
+# Activate
+conda activate ktalysticflow
+
+# Verify installation (optional)
+python bin/check_env.py
+
+# Launch KAST
+python main.py
+```
+
+---
+
+## ⚡ Parallel Processing
+
+K-talysticFlow supports **multi-core parallel processing** for 5-10x faster performance!
+
+### Quick Configuration
+
+Edit `settings.py` (Section 12):
 
 ```python
-# Section 12: PARALLEL PROCESSING CONFIGURATIONS
-ENABLE_PARALLEL_PROCESSING = True    # Enable/disable parallelism
-N_WORKERS = None                     # None = auto-detect (recommended)
+ENABLE_PARALLEL_PROCESSING = True    # On/Off
+N_WORKERS = None                     # None = auto-detect (RECOMMENDED)
 PARALLEL_BATCH_SIZE = 100000         # Molecules per batch
-PARALLEL_MIN_THRESHOLD = 10000       # Min dataset size for parallelism
+PARALLEL_MIN_THRESHOLD = 10000       # Min dataset size for parallel
 ```
 
-**Configuration Options:**
-- `N_WORKERS = None` → Auto-detect optimal cores (leaves 1 free) ✅ **RECOMMENDED**
-- `N_WORKERS = -1` → Use all available cores
+**Worker Options:**
+- `N_WORKERS = None` → Auto-detect optimal cores ✅ **RECOMMENDED**
+- `N_WORKERS = -1` → Use all cores
 - `N_WORKERS = 4` → Use exactly 4 cores
-- `N_WORKERS = 1` → Disable parallelism (sequential processing)
+- `N_WORKERS = 1` → Disable parallel (sequential only)
 
-**Memory Recommendations:**
-- **16GB+ RAM**: `PARALLEL_BATCH_SIZE = 100000` (default)
-- **8GB RAM**: `PARALLEL_BATCH_SIZE = 50000`
-- **4GB RAM**: `PARALLEL_BATCH_SIZE = 25000`
+### Or Configure Interactively
 
-### 📊 Which Scripts Use Parallel Processing?
+```
+python main.py
+→ [8] Advanced Options
+→ [3] Configure CPU Cores
+→ Choose auto or specific number
+```
 
-| Script | Parallel Support | Typical Speedup |
-|--------|------------------|-----------------|
-| `2_featurization.py` | ✅ Yes | 5-10x |
-| `4_3_tanimoto_similarity.py` | ✅ Yes | 3-5x |
-| `4_4_learning_curve.py` | ✅ Yes | 4-8x |
-| `5_0_featurize_for_prediction.py` | ✅ Yes | 5-10x |
-| Other scripts | Sequential | N/A |
+### Scripts with Parallel Support
 
-**Note:** Parallel processing automatically activates only when dataset size exceeds `PARALLEL_MIN_THRESHOLD` (default: 10,000 molecules).
+| Script | Speedup |
+|--------|---------|
+| `2_featurization.py` | 5-10x |
+| `4_3_tanimoto_similarity.py` | 3-5x |
+| `4_4_learning_curve.py` | 4-8x |
+| `5_0_featurize_for_prediction.py` | 5-10x |
 
----
-
-## � Documentation
-
-**[📘 Complete Documentation](https://lmm.uefs.br/wp-content/uploads/2025/10/KAST-Documentation.html)** — Full user guide with detailed explanations, examples, and troubleshooting.
+**Automatic activation:** Parallel mode only engages when dataset > 10,000 molecules.
 
 ---
 
-## �🚀 Quick Start
+## 🎯 Quick Start
 
-| Task                | Command                        |
-|---------------------|-------------------------------|
-| Prepare data        | `python bin/1_preparation.py`  |
-| Featurize           | `python bin/2_featurization.py`|
-| Train model         | `python bin/3_create_training.py` |
-| Main evaluation     | `python bin/4_0_evaluation_main.py` |
-| Predict new         | `python bin/5_1_run_prediction.py`|
-
-Or use the interactive menu:
 ```bash
+# Launch interactive menu
 python main.py
 ```
-And follow the on-screen instructions!
 
-### 🎛️ Advanced Options Menu
+**Menu Options:**
+1. Prepare & Split Data
+2. Generate Fingerprints
+3. Train Model
+4. Evaluate (ROC/AUC, Cross-Val, etc.)
+5. Predict New Molecules
+6. View Results
+7. Check Data Status
+8. Advanced Tools (env check, parallel test, config)
 
-Access testing and configuration tools via **option [8]** in the main menu:
-
-| Option | Feature | Description |
-|--------|---------|-------------|
-| **[8] → [1]** | Check Environment | Verify all dependencies are installed |
-| **[8] → [2]** | Test Parallel Processing | Run 6 automated tests for compatibility |
-| **[8] → [3]** | Configure CPU Cores | Adjust parallel processing cores at runtime |
-
-**Configure CPU cores without editing files:**
+**Or run individual scripts:**
 ```bash
-# In main menu, select [8] then [3]
-[0] Auto-detect (recommended) → uses N-1 cores
-[1-N] Use specific number of cores
-[-1] Use ALL cores
+python bin/1_preparation.py          # Prepare data
+python bin/2_featurization.py        # Featurize molecules
+python bin/3_create_training.py      # Train model
+python bin/4_0_evaluation_main.py    # Evaluate
+python bin/5_1_run_prediction.py     # Predict
 ```
 
 ---
 
-## 👩‍🔬 Scientific Workflow
+## 📊 Outputs
 
-1. **Data Preparation**: Import SMILES, label, and split datasets
-2. **Featurization**: Generate ECFP/Morgan fingerprints (QSAR standard)
-3. **Training**: DeepChem MultitaskClassifier neural network
-4. **Evaluation**: ROC/AUC, accuracy, precision, recall, F1, cross-validation, enrichment factor, Tanimoto similarity, learning curve
-5. **Prediction**: Screen new molecules using K-Prediction Score, rank candidates, export CSV
+All results saved to `results/` folder:
 
----
-
-## � Usage Examples
-
-### Example 1: Complete Pipeline for New Project
-
-```bash
-# Start the interactive menu
-python main.py
-
-# Then follow this sequence:
-# [1] Prepare and Split Data → Creates train/test sets (you'll choose the split ratio)
-# [2] Generate Fingerprints → Featurizes molecules
-# [3] Train the Model → Creates neural network
-# [4] → [1] Run ALL evaluations → Comprehensive analysis
-# [5] → [3] Featurize + Predict → Screen new molecules
 ```
-
-### Example 2: Running Individual Scripts
-
-```bash
-# Prepare data
-python bin/1_preparation.py
-
-# Generate fingerprints (with parallel processing)
-python bin/2_featurization.py
-
-# Create and train model
-python bin/3_create_training.py
-
-# Evaluate with cross-validation only
-python bin/4_1_cross_validation.py
-
-# Predict new molecules
-python bin/5_0_featurize_for_prediction.py
-python bin/5_1_run_prediction.py
-```
-
-### Example 3: Using Parallel Processing
-
-```python
-# Option 1: Configure via interactive menu
-python main.py
-# Select [8] Advanced Options → [3] Configure CPU Cores
-# Choose [0] for auto-detect (recommended)
-
-# Option 2: Edit settings.py directly
-# Open settings.py and modify Section 12:
-ENABLE_PARALLEL_PROCESSING = True
-N_WORKERS = None  # Auto-detect (uses N-1 cores)
-PARALLEL_BATCH_SIZE = 100000
-PARALLEL_MIN_THRESHOLD = 10000
-```
-
-### Example 4: Screening Large Compound Libraries
-
-```bash
-# Place your library in data/ folder
-# Example: data/zinc_library.smi with 500K molecules
-
-python main.py
-# Select [5] → [1] Featurize for Prediction
-# Select your library file
-# Wait for parallel featurization (~5-10 minutes with parallel)
-
-# Then predict
-# Select [5] → [2] Only Predict
-# Choose filtering: by cutoff or top-N
-# Export results to CSV
-```
-
-### Example 5: Testing and Validation
-
-```bash
-# Check environment
-python main.py
-# Select [8] → [1] Check Environment
-
-# Test parallel processing
-python main.py
-# Select [8] → [2] Test Parallel Processing
-
-# Or run directly:
-python bin/check_env.py
-python bin/test_parallel_compatibility.py
-```
-
-### Example 6: Custom Configuration for Limited RAM
-
-```python
-# If you have 8GB RAM, edit settings.py:
-ENABLE_PARALLEL_PROCESSING = True
-N_WORKERS = 4  # Use 4 cores instead of all
-PARALLEL_BATCH_SIZE = 50000  # Smaller batches
-PARALLEL_MIN_THRESHOLD = 10000
-```
-
-### Example 7: Analyzing Results
-
-```bash
-# After pipeline completion, find results in:
 results/
-├── 01_train_set.csv              # Training molecules
-├── 01_test_set.csv               # Test molecules  
-├── 4_0_evaluation_report.txt    # Main metrics (AUC, accuracy, etc)
-├── 4_1_cross_validation_results.txt
-├── 4_2_enrichment_factor_results.txt
-├── 05_new_molecule_predictions.csv  # Ranked predictions with K-scores
-└── logs/kast_20251010.log       # Daily log file
-
-# Open predictions in Excel/pandas:
-import pandas as pd
-df = pd.read_csv('results/05_new_molecule_predictions.csv')
-top_candidates = df.head(100)  # Top 100 predictions
+├── 01_train_set.csv                 # Training data
+├── 01_test_set.csv                  # Test data
+├── 4_0_evaluation_report.txt        # Main metrics (AUC, accuracy)
+├── 4_1_cross_validation_results.txt # Cross-validation scores
+├── 4_2_enrichment_factor.txt        # Enrichment analysis
+├── 4_3_tanimoto_similarity.txt      # Similarity analysis
+├── 4_4_learning_curve.txt           # Model learning progression
+├── 05_new_molecule_predictions.csv  # Predicted molecules (K-Score ranked)
+├── plots/                           # ROC, Learning Curves (PNG/PDF)
+└── logs/                            # kast_YYYYMMDD.log
 ```
-
-### Example 8: Troubleshooting
-
-```bash
-# If script fails, check the log:
-cat results/logs/kast_YYYYMMDD.log  # Linux/Mac
-type results\logs\kast_YYYYMMDD.log  # Windows
-
-# Run dependency check:
-python bin/check_env.py
-
-# Test specific functionality:
-python bin/test_parallel_compatibility.py
-```
-
----
-
-## �📈 Outputs
-
-- `results/`: All logs, models, reports, plots (ROC, learning curve, etc)
-- `05_new_molecule_predictions.csv`: Ranked predictions for new molecules (sorted by K-Prediction Score)
-
----
-
-## ⭐ How to Cite
-
-> **K-talysticFlow: A Deep Learning Pipeline for Virtual Screening of Bioactive Compounds**  
-> Késsia S. Santos; Manoelito C. Santos Junior. (2025). Laboratory of Molecular Modeling (LMM), State University of Feira de Santana.
-
----
-
-## 👥 Authors & Acknowledgments
-
-- **Késsia Souza Santos**
-    - Email: `kelsouzs.uefs@gmail.com`
-    - [GitHub](https://github.com/kelsouzs)
-    - [LinkedIn](https://www.linkedin.com/in/kelsouzs)
-- **Advisor:** Prof. Dr. Manoelito Coelho dos Santos Junior
-- **Lab:** [LMM-UEFS](https://lmm.uefs.br/)
-- **Funding:** National Council for Scientific and Technological Development (CNPq)
 
 ---
 
 ## ❓ FAQ
 
-**Q:** What Python version do I need?  
-**A:** Python 3.9+ recommended.
+**Q: Which setup should I use?**  
+A: Windows → `setup.exe` (one-click). Linux → `./setup.sh`. Both handle everything automatically.
 
-**Q:** How do I install RDKit?  
-**A:**  
-```bash
-conda install -c conda-forge rdkit
-```
+**Q: Do I need to type `conda activate` every time?**  
+A: No! Shortcuts and `run_kast.bat` handle it automatically.
 
-**Q:** Where do outputs go?  
-**A:** All results are in the `results/` folder.
+**Q: How much faster is parallel processing?**  
+A: 5-10x faster for large datasets (100K+ molecules). Automatic on/off based on dataset size.
 
-**Q:** How do I run on my own molecules?  
-**A:** Place your `.smi` file in `dados/` and use `[5]` menu option.
+**Q: Where are my results?**  
+A: All outputs in `results/` folder (logs, models, plots, CSVs).
 
-**Q:** What is the K-Prediction Score?  
-**A:** The K-Prediction Score is the proprietary scoring function used by K-talysticFlow to rank molecular activity predictions, with values ranging from 0 to 1 (higher scores indicate higher predicted activity).
+**Q: My setup failed - what do I do?**  
+A: Run `python bin/check_env.py` to diagnose. Check the logs in `results/logs/`.
 
-**Q:** How do I test if parallel processing is working?  
-**A:** Use the menu: `python main.py` → `[8] Advanced Options` → `[2] Test Parallel Processing`
-
-**Q:** Can I change CPU cores without editing settings.py?  
-**A:** Yes! Use menu option `[8]` → `[3] Configure CPU Cores` for interactive configuration.
+**Q: Can I change settings after setup?**  
+A: Yes! Edit `settings.py` anytime or use menu option `[8]→[3]` for interactive config.
 
 ---
 
-## 🧪 For Developers
+## 🔗 Links
 
-### Testing Parallel Processing
-
-Validate the parallel processing implementation:
-
-```bash
-# Option 1: Via interactive menu
-python main.py
-# Select [8] → [2] Test Parallel Processing
-
-# Option 2: Direct command
-python bin/test_parallel_compatibility.py
-```
-
-The test suite runs 6 comprehensive tests:
-1. ✅ Import settings.py
-2. ✅ Verify configuration variables
-3. ✅ Check required imports (joblib, multiprocessing)
-4. ✅ Test get_optimal_workers() logic
-5. ✅ Validate script compatibility
-6. ✅ Test threshold activation logic
-
-### Modifying Parallel Processing
-
-When making changes to parallel processing code:
-
-1. Edit the relevant script(s)
-2. Update configuration in `settings.py` if needed
-3. Run test suite to validate: `python bin/test_parallel_compatibility.py`
-4. Test with real data: Use small dataset first
-5. Update documentation (README.md)
+- 📘 **[Full Documentation](https://lmm.uefs.br/wp-content/uploads/2025/10/KAST-Documentation.html)**
+- 👤 **[LinkedIn](https://www.linkedin.com/in/kelsouzs)**
+- 💻 **[GitHub Profile](https://github.com/kelsouzs)**
+- 🏫 **[LMM Laboratory](https://lmm.uefs.br/)**
 
 ---
 
-## 🤝 Contributing
+## 👥 Authors
 
-Pull requests welcome! For major changes, open an issue first to discuss.
+- **Késsia Souza Santos** — [GitHub](https://github.com/kelsouzs) | [LinkedIn](https://www.linkedin.com/in/kelsouzs)
+- **Advisor:** Prof. Dr. Manoelito C. Santos Junior
+- **Lab:** Laboratory of Molecular Modeling (LMM-UEFS)
+- **Funding:** CNPq (Brazilian National Research Council)
+
+---
+
+## 📜 License
+
+MIT License — See [LICENSE](LICENSE) file
 
 ---
 
-## 📬 Contact
-
-Questions or suggestions?  
-Open an [issue](https://github.com/kelsouzs/KAST/issues) or email [kelsouzs.uefs@gmail.com](mailto:kelsouzs.uefs@gmail.com)
-
----
+**Questions or bugs?** Open an [issue](https://github.com/kelsouzs/KAST/issues) or email [kelsouzs.uefs@gmail.com](mailto:kelsouzs.uefs@gmail.com)

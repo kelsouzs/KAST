@@ -1,11 +1,27 @@
+/* Logo menor e centralizada na sidebar */
+.wy-side-nav-search .wy-dropdown > a img.logo,
+.wy-side-nav-search > a img.logo {
+    max-width: 120px !important;
+    display: block;
+    margin: 0 auto;
+}
+
+/* Esconde o flyout "latest" */
+.rst-versions {
+    display: none !important;
+}
+
 /* Tipografia igual DeepChem */
 body, .wy-nav-content {
     font-family: Lato, proxima-nova, "Helvetica Neue", Arial, sans-serif;
     font-size: 14px;
 }
 
-/* Largura do conteúdo */
 .wy-nav-content {
     max-width: 850px;
 }
 
+/* Esconde H1 duplicado no index */
+.wy-nav-content h1:first-of-type {
+    display: none;
+}

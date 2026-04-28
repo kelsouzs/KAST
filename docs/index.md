@@ -8,7 +8,7 @@
 </div>
 ```
 
-K-talysticFlow or **K**-atalystic **A**utomated **S**creening **T**askflow (KAST) is an automated, interactive pipeline for training and using Deep Learning models to predict molecular bioactivity.
+# K-talysticFlow (KAST) Documentation
 
 ***
 

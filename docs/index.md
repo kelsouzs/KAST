@@ -8,8 +8,6 @@
 </div>
 ```
 
-# K-talysticFlow (KAST) Documentation
-
 ***
 
 ## What is KAST?

@@ -274,6 +274,7 @@ def step_3_training():
     """
     print("\n🔄 Creating and training model...")
     result = run_script("3_create_training.py")
+    return result
 
 def step_4_evaluation_menu():
     """Displays evaluation submenu allowing single or all evaluations"""
@@ -540,24 +541,6 @@ def advanced_options_menu():
         else:
             print("Invalid option.")
             input("Press Enter to try again...")
-
-def run_full_pipeline():
-    """Runs the full pipeline with pauses and clearing between steps"""
-    print("\n----------------- 🔄 Running Full Pipeline -------------------")
-    if not step_1_preparation(): return
-    pause()
-    if not step_2_featurization(): return
-    pause()
-    if not step_3_training(): return
-    pause()
-    print("\n--- Starting full evaluation as part of the flow ---")
-    for script_name in EVALUATION_SCRIPTS:
-        if not run_script(script_name):
-            print(f"\nFlow Interrupted Due to Error in Evaluation Script: '{script_name}'")
-            return
-        if script_name != EVALUATION_SCRIPTS[-1]:
-            pause()
-    print("\n\n✅ Full Pipeline Completed Successfully!")
 
 def display_menu():
     os.system('cls' if os.name == 'nt' else 'clear')

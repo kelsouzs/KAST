@@ -287,7 +287,3 @@ print(f"  Learning Rate: {cfg.LEARNING_RATE}")
 
 ---
 
-## Next Steps
-
-→ **[Parallel Processing Guide](../user-guide/parallel-processing.md)** — Detailed parallel tuning  
-→ **[Troubleshooting](troubleshooting.md)** — Performance issues?

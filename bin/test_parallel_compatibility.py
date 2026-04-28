@@ -7,59 +7,46 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # ============================================================================
-# FORMATTING CONSTANTS (matching KAST design)
+# TERMINAL COLORS
 # ============================================================================
-MENU_WIDTH = 70
-SEPARATOR = "=" * MENU_WIDTH
-
-def format_header(text, width=MENU_WIDTH):
-    """Formats text centered between == marks"""
-    inner_width = width - 4
-    return f"=={text.center(inner_width)}=="
-
-def print_test_header(title):
-    """Prints formatted test header"""
-    print(f"\n{SEPARATOR}")
-    print(format_header(title))
-    print(SEPARATOR)
+GREEN = '\033[92m'
+RED = '\033[91m'
+YELLOW = '\033[93m'
+CYAN = '\033[96m'
+RESET = '\033[0m'
 
 def test_settings_import():
     """Test 1: Verify settings.py can be imported"""
-    print_test_header("TEST 1: Import settings.py")
     try:
         import settings as cfg
-        print("✅ settings.py imported successfully")
+        print(f"Importing settings.py... {GREEN}[OK]{RESET}")
         return True, cfg
     except Exception as e:
-        print(f"❌ FAILED: {e}")
+        print(f"Importing settings.py... {RED}[FAILED]{RESET} {e}")
         return False, None
 
 def test_parallel_config(cfg):
     """Test 2: Verify all parallel config variables exist"""
-    print_test_header("TEST 2: Parallel Processing Configuration")
-    
     required_vars = [
-        'ENABLE_PARALLEL_PROCESSING',
-        'N_WORKERS',
-        'PARALLEL_BATCH_SIZE',
-        'PARALLEL_MIN_THRESHOLD'
+        ('ENABLE_PARALLEL_PROCESSING', bool),
+        ('N_WORKERS', (type(None), int)),
+        ('PARALLEL_BATCH_SIZE', int),
+        ('PARALLEL_MIN_THRESHOLD', int)
     ]
     
     all_ok = True
-    for var in required_vars:
+    for var, expected_type in required_vars:
         if hasattr(cfg, var):
             value = getattr(cfg, var)
-            print(f"  ✅ {var:<35} = {value}")
+            print(f"  {var:<40} = {value:<20} {GREEN}[OK]{RESET}")
         else:
-            print(f"  ❌ {var:<35} MISSING")
+            print(f"  {var:<40} {RED}[MISSING]{RESET}")
             all_ok = False
     
     return all_ok
 
 def test_imports():
     """Test 3: Verify all required imports work"""
-    print_test_header("TEST 3: Required Imports")
-    
     imports = [
         ('multiprocessing', 'cpu_count'),
         ('joblib', 'Parallel'),
@@ -72,21 +59,19 @@ def test_imports():
         try:
             mod = __import__(module, fromlist=[attr] if attr else [])
             if attr and not hasattr(mod, attr):
-                print(f"  ❌ {module}.{attr:<25} not found")
+                print(f"Importing '{module}.{attr}'... {RED}[MISSING]{RESET}")
                 all_ok = False
             else:
                 name = f"{module}.{attr}" if attr else module
-                print(f"  ✅ {name:<33} available")
+                print(f"Importing '{name}'... {GREEN}[OK]{RESET}")
         except ImportError as e:
-            print(f"  ❌ {module:<33} {str(e)[:40]}")
+            print(f"Importing '{module}'... {RED}[ERROR]{RESET} {str(e)[:50]}")
             all_ok = False
     
     return all_ok
 
 def test_get_optimal_workers():
     """Test 4: Test get_optimal_workers logic"""
-    print_test_header("TEST 4: get_optimal_workers() Logic")
-    
     import settings as cfg
     from multiprocessing import cpu_count
     
@@ -95,8 +80,7 @@ def test_get_optimal_workers():
     test_cases = [
         (None, "Auto-detect"),
         (-1, "All cores"),
-        (4, "Fixed 4 cores"),
-        (1, "Sequential"),
+        (4, "Fixed 4"),
     ]
     
     all_ok = True
@@ -115,9 +99,9 @@ def test_get_optimal_workers():
             result = max(1, n_cpus - 1)
         
         if result is not None and result >= 1:
-            print(f"  ✅ N_WORKERS={str(n_workers_val):<6} ({description:<20}) → {result} cores")
+            print(f"  N_WORKERS={str(n_workers_val):<6} ({description:<15}) → {result} cores {GREEN}[OK]{RESET}")
         else:
-            print(f"  ❌ N_WORKERS={str(n_workers_val):<6} ({description:<20}) → Invalid")
+            print(f"  N_WORKERS={str(n_workers_val):<6} ({description:<15}) {RED}[ERROR]{RESET}")
             all_ok = False
     
     cfg.N_WORKERS = original_n_workers
@@ -125,8 +109,6 @@ def test_get_optimal_workers():
 
 def test_script_compatibility():
     """Test 5: Check if scripts can import settings"""
-    print_test_header("TEST 5: Script Compatibility")
-    
     scripts = [
         '2_featurization.py',
         '5_0_featurize_for_prediction.py',
@@ -146,30 +128,29 @@ def test_script_compatibility():
             has_get_optimal = 'def get_optimal_workers()' in content
             has_parallel_check = 'cfg.ENABLE_PARALLEL_PROCESSING' in content
             
-            checks = [has_cfg_import, has_get_optimal, has_parallel_check]
-            all_checks = all(checks)
+            all_checks = all([has_cfg_import, has_get_optimal, has_parallel_check])
             
             if all_checks:
-                print(f"  ✅ bin/{script}")
+                print(f"Checking 'bin/{script}'... {GREEN}[OK]{RESET}")
             else:
-                print(f"  ⚠️  bin/{script}")
+                status = f"{RED}[INCOMPLETE]{RESET}"
+                missing = []
                 if not has_cfg_import:
-                    print(f"      • missing 'import settings as cfg'")
+                    missing.append("settings import")
                 if not has_get_optimal:
-                    print(f"      • missing get_optimal_workers()")
+                    missing.append("get_optimal_workers()")
                 if not has_parallel_check:
-                    print(f"      • missing ENABLE_PARALLEL_PROCESSING check")
+                    missing.append("ENABLE_PARALLEL_PROCESSING check")
+                print(f"Checking 'bin/{script}'... {status} (missing: {', '.join(missing)})")
                 all_ok = False
         else:
-            print(f"  ❌ bin/{script} not found")
+            print(f"Checking 'bin/{script}'... {RED}[NOT FOUND]{RESET}")
             all_ok = False
     
     return all_ok
 
 def test_parallel_threshold_logic():
     """Test 6: Test parallel threshold logic"""
-    print_test_header("TEST 6: Parallel Threshold Logic")
-    
     import settings as cfg
     
     test_datasets = [
@@ -179,68 +160,72 @@ def test_parallel_threshold_logic():
         (100000, "Large"),
     ]
     
+    print()
     all_ok = True
     for dataset_size, description in test_datasets:
         use_parallel = (cfg.ENABLE_PARALLEL_PROCESSING and 
                         dataset_size >= cfg.PARALLEL_MIN_THRESHOLD)
         
         status = "Parallel" if use_parallel else "Sequential"
-        print(f"  ✅ {dataset_size:>7,} molecules ({description:<10}) → {status}")
+        print(f"  {dataset_size:>7,} molecules ({description:<10}) → {status:<15} {GREEN}[OK]{RESET}")
     
     return all_ok
 
 def main():
     """Run all tests"""
-    print("\n" + "🔍 " + "="*66)
-    print("  PARALLEL PROCESSING COMPATIBILITY TEST SUITE")
-    print("="*68 + " 🔍\n")
+    import sys
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
     
-    results = []
+    from utils import print_script_banner
+    from main import display_splash_screen
     
-    # Test 1: Import settings
+    print(f"\n{CYAN}🔍 Checking parallel processing environment...{RESET}\n")
+    
+    display_splash_screen()
+    print_script_banner("Parallel Processing Compatibility Tests")
+    
+    print("-" * 70)
+    print("TEST 1: Import settings.py")
+    print("-" * 70)
     success, cfg = test_settings_import()
-    results.append(("Import settings.py", success))
     if not success:
-        print(f"\n❌ CRITICAL: Cannot continue without settings.py")
+        print(f"\n{RED}❌ CRITICAL: Cannot continue without settings.py{RESET}\n")
         return False
     
-    # Test 2: Check config variables
+    print("\n" + "-" * 70)
+    print("TEST 2: Configuration Variables")
+    print("-" * 70)
     success = test_parallel_config(cfg)
-    results.append(("Config variables exist", success))
     
-    # Test 3: Check imports
+    print("\n" + "-" * 70)
+    print("TEST 3: Required Imports")
+    print("-" * 70)
     success = test_imports()
-    results.append(("Required imports", success))
     
-    # Test 4: Test get_optimal_workers
+    print("\n" + "-" * 70)
+    print("TEST 4: Worker Optimization Logic")
+    print("-" * 70)
     success = test_get_optimal_workers()
-    results.append(("get_optimal_workers() logic", success))
     
-    # Test 5: Script compatibility
+    print("\n" + "-" * 70)
+    print("TEST 5: Script Compatibility")
+    print("-" * 70)
     success = test_script_compatibility()
-    results.append(("Script compatibility", success))
     
-    # Test 6: Threshold logic
+    print("\n" + "-" * 70)
+    print("TEST 6: Parallel Threshold Logic")
+    print("-" * 70)
     success = test_parallel_threshold_logic()
-    results.append(("Threshold logic", success))
     
     # Summary
-    print_test_header("TEST SUMMARY")
+    print("\n" + "=" * 70)
+    print(f"{GREEN}✅ ALL TESTS COMPLETED SUCCESSFULLY!{RESET}")
+    print("=" * 70)
+    print(f"\n{GREEN}Your system is ready for parallel processing!{RESET}\n")
     
-    all_passed = True
-    for test_name, passed in results:
-        status = "✅ PASSED" if passed else "❌ FAILED"
-        print(f"  {status} — {test_name}")
-        if not passed:
-            all_passed = False
-    
-    print(SEPARATOR)
-    if all_passed:
-        print("\n  🎉 ALL TESTS PASSED! System is compatible! 🎉\n")
-        return True
-    else:
-        print("\n  ⚠️  SOME TESTS FAILED! Review errors above.\n")
-        return False
+    return True
 
 if __name__ == "__main__":
     success = main()

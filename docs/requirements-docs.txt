@@ -1,0 +1,4 @@
+sphinx>=5.0
+sphinx-markdown-builder>=0.5.5
+myst-parser>=0.18.0
+sphinx-rtd-theme>=1.0.0

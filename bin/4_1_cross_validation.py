@@ -124,9 +124,9 @@ def ensure_cv_reproducibility(seed=42):
         import deepchem as dc
         dc.utils.set_random_seed(seed)
     except:
-        pass
+        pass  # DeepChem seed is optional
     
-    print("✅ Cross-validation reproducibility configured")
+    print("✅ CV reproducibility configured (seeds: Python, NumPy, TensorFlow)")
 
 def load_and_featurize_all_data():
     from rdkit import RDLogger

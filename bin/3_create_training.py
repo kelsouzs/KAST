@@ -49,11 +49,10 @@ def ensure_training_reproducibility(seed=42):
     
     try:
         dc.utils.set_random_seed(seed)
-        print("✅ DeepChem random seed set")
     except Exception:
-        print("⚠️ DeepChem seed setting not available")
+        pass  # DeepChem seed is optional, not critical
     
-    print("✅ Training reproducibility configured - identical results guaranteed")
+    print("✅ Training reproducibility configured (seeds: Python, NumPy, TensorFlow)")
 
 def save_training_metadata():
     """Save comprehensive training metadata."""

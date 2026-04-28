@@ -1,3 +1,6 @@
+# Configuration file for Sphinx documentation builder
+# https://www.sphinx-doc.org/en/master/usage/configuration.html
+
 # -- Project information
 project = 'K-talysticFlow (KAST)'
 copyright = '2025, Laboratory of Molecular Modeling (LMM-UEFS)'
@@ -29,19 +32,17 @@ html_theme = 'sphinx_rtd_theme'
 html_theme_options = {
     'logo_only': True,
     'navigation_depth': 4,
-    'collapse_navigation': False,
+    'collapse_navigation': True,   # sem setinhas de expandir
     'sticky_navigation': True,
     'prev_next_buttons_location': 'both',
-    'style_nav_header_background': '#9c7aff',  # roxo KAST
+    'style_nav_header_background': '#9c7aff',
 }
 
 html_logo = '_static/kast_logo.png'
 html_static_path = ['_static']
+html_css_files = ['custom.css']
 
 # -- Read the Docs
 master_doc = 'index'
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 language = 'en'
-
-html_css_files = ['custom.css']
-html_static_path = ['_static']

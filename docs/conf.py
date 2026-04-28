@@ -35,7 +35,7 @@ html_theme_options = {
     'collapse_navigation': True,   # sem setinhas de expandir
     'sticky_navigation': True,
     'prev_next_buttons_location': 'both',
-    'style_nav_header_background': '#9c7aff',
+    'style_nav_header_background': "#ffffff",
 }
 
 html_logo = '_static/kast_logo.png'

@@ -1,3 +1,17 @@
+```{raw} html
+<div style="text-align: center; padding: 2.5rem 0 1.5rem 0;">
+  <h1 style="font-size: 2.2rem; margin: 0;">K-talysticFlow (KAST)</h1>
+  <p style="font-size: 1.1rem; color: #666; margin-top: 0.5rem;">
+    <strong>K</strong>-atalystic <strong>A</strong>utomated <strong>S</strong>creening
+    <strong>T</strong>askflow — Automated Deep Learning for Molecular Bioactivity Prediction
+  </p>
+</div>
+```
+
+K-talysticFlow or **K**-atalystic **A**utomated **S**creening **T**askflow (KAST) is an automated, interactive pipeline for training and using Deep Learning models to predict molecular bioactivity.
+
+***
+
 ## What is KAST?
 
 K-talysticFlow (KAST) is an open-source pipeline that democratizes the use of deep learning
@@ -29,7 +43,7 @@ The fastest way to get started is to set up the Conda environment and launch the
 
 ```bash
 conda env create -f environment.yml
-conda activate kast
+conda activate ktalysticflow
 python main.py
 ```
 
@@ -51,6 +65,11 @@ KAST is developed and maintained at the
 [Laboratory of Molecular Modeling (LMM-UEFS)](https://lmm.uefs.br/) by Késsia Souza Santos.
 Contributions, issues, and suggestions are welcome via the
 [GitHub repository](https://github.com/kelsouzs/KAST).
+
+**Funding:** This project was developed with support from
+[CNPq](https://www.gov.br/cnpq/) (undergraduate research scholarship, PIBIC/IC)
+and is currently continued under a
+[CAPES](https://www.gov.br/capes/) graduate research scholarship (MSc).
 
 ***
 

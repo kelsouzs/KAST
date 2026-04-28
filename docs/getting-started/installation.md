@@ -6,7 +6,7 @@ Two installation methods: **Automated** (recommended) or **Manual**.
 
 ## 🪟 Windows Installation
 
-### Option 1: Automated Setup (Recommended!) ⚡
+### Option 1: Automated Setup (Recommended!) 
 
 **Best for:** Everyone — no terminal needed!
 
@@ -165,7 +165,3 @@ Success! All dependencies are installed.
 - **Fix:** Try manual setup and check [Troubleshooting](../support/troubleshooting.md)
 
 ---
-
-## Next Steps
-
-→ **[Quick Start](quick-start.md)** — Launch KAST and run your first analysis

@@ -2,7 +2,6 @@
 
 Detailed walkthrough of each pipeline step.
 
----
 
 ## Before You Start
 
@@ -12,7 +11,7 @@ Detailed walkthrough of each pipeline step.
 
 ---
 
-## Step 1️⃣: Data Preparation
+## Step 1: Data Preparation
 
 **Menu Option:** `[1]`  
 **Script:** `bin/1_preparation.py`
@@ -58,7 +57,7 @@ results/
 
 ---
 
-## Step 2️⃣: Featurization
+## Step 2: Featurization
 
 **Menu Option:** `[2]`  
 **Script:** `bin/2_featurization.py`
@@ -94,7 +93,7 @@ Fingerprint data saved internally (featurized numpy arrays)
 
 ---
 
-## Step 3️⃣: Model Training
+## Step 3: Model Training
 
 **Menu Option:** `[3]`  
 **Script:** `bin/3_create_training.py`
@@ -134,7 +133,7 @@ results/
 
 ---
 
-## Step 4️⃣: Model Evaluation
+## Step 4: Model Evaluation
 
 **Menu Option:** `[4]` → Choose evaluation type
 
@@ -216,7 +215,7 @@ Plot saved: learning_curve.png
 
 ---
 
-## Step 5️⃣: Featurize New Molecules
+## Step 5: Featurize New Molecules
 
 **Menu Option:** `[5]`  
 **Script:** `bin/5_0_featurize_for_prediction.py`
@@ -249,7 +248,7 @@ Featurized library saved internally
 
 ---
 
-## Step 6️⃣: Run Predictions
+## Step 5.1: Run Predictions
 
 **Menu Option:** `[6]`  
 **Script:** `bin/5_1_run_prediction.py`
@@ -299,20 +298,3 @@ CCCc1ccccc1O                        0.87     Active
 ```
 
 ---
-
-## Understanding Your Results
-
-✅ **Good Model:** AUC > 0.8, Accuracy > 80%  
-⚠️ **Decent Model:** AUC 0.7-0.8, Accuracy 70-80%  
-❌ **Poor Model:** AUC < 0.7, Accuracy < 70%
-
-If results are poor:
-→ Check [Troubleshooting](../support/troubleshooting.md)  
-→ Review [Data Preparation](data-preparation.md)
-
----
-
-## Next Steps
-
-→ **[Understanding Outputs](outputs.md)** — Interpret results  
-→ **[Parallel Processing](parallel-processing.md)** — Speed things up

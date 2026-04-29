@@ -22,29 +22,36 @@ Description:
 import os
 import warnings
 
+# Suppress warnings globally (lightweight - no TensorFlow imports needed here)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=FutureWarning)
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 
-try:
-    import tensorflow as tf
-    tf.get_logger().setLevel('ERROR')
-    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-except ImportError:
-    pass  
-
-try:
-    import logging
-    logging.getLogger('deepchem').setLevel('ERROR')
-except ImportError:
-    pass
-
 import sys
 import subprocess
 import argparse
 import settings as cfg
+
+# Lazy logging configuration - only executed by subprocesses if needed
+def _configure_heavy_logging():
+    """
+    Configures TensorFlow and DeepChem logging.
+    Called lazily by subprocesses only when needed.
+    """
+    try:
+        import tensorflow as tf
+        tf.get_logger().setLevel('ERROR')
+        tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+    except ImportError:
+        pass
+    
+    try:
+        import logging
+        logging.getLogger('deepchem').setLevel('ERROR')
+    except ImportError:
+        pass
 
 # =============================================================================
 # Project Metadata

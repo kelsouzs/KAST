@@ -1,3 +1,4 @@
+# K-talysticFlow (KAST) Documentation
 ```{raw} html
 <div style="text-align: center; padding: 2.5rem 0 1.5rem 0;">
   <h1 style="font-size: 2.2rem; margin: 0;">K-talysticFlow (KAST)</h1>
@@ -74,6 +75,7 @@ and is currently continued under a
 ```{toctree}
 :maxdepth: 1
 :caption: Getting Started
+:hidden:
 
 getting-started/overview
 getting-started/installation
@@ -83,6 +85,7 @@ getting-started/quick-start
 ```{toctree}
 :maxdepth: 1
 :caption: User Guide
+:hidden:
 
 user-guide/pipeline
 user-guide/step-by-step
@@ -94,6 +97,7 @@ user-guide/outputs
 ```{toctree}
 :maxdepth: 1
 :caption: Support
+:hidden:
 
 support/faq
 support/troubleshooting

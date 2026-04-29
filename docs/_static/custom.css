@@ -1,20 +1,30 @@
-/* Tipografia igual DeepChem */
+/* ============================================
+   K-talysticFlow (KAST) — custom.css
+   ============================================ */
+
+
+/* Tipografia */
 body, .wy-nav-content {
     font-family: Lato, proxima-nova, "Helvetica Neue", Arial, sans-serif;
     font-size: 14px;
 }
+
 
 /* Largura do conteúdo */
 .wy-nav-content {
     max-width: 850px;
 }
 
+
 /* Esconde o flyout "latest" do RTD */
 .rst-versions {
     display: none !important;
 }
 
-/* Esconde H1 do Sphinx (usado só para breadcrumb/título) */
-h1.kast-hidden-title {
+
+/* Esconde o H1 gerado pelo Sphinx no index
+   (usado só pelo breadcrumb/título do PDF — visualmente
+    substituído pelo bloco raw HTML centralizado) */
+.wy-nav-content h1:first-of-type {
     display: none;
 }

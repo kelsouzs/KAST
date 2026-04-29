@@ -156,11 +156,11 @@ def get_train_test_split():
     print("\n" + "="*70)
     print("� TRAIN/TEST SPLIT CONFIGURATION")
     print("="*70)
-    print(f"\nCurrent default (settings.py): {(1-cfg.TEST_SET_FRACTION)*100:.0f}% train / {cfg.TEST_SET_FRACTION*100:.0f}% test")
+    print(f"\nCurrent default (settings.py): {cfg.TRAIN_SET_FRACTION*100:.0f}% train / {(1-cfg.TRAIN_SET_FRACTION)*100:.0f}% test")
     print("\nCommon splits:")
-    print("  1. 80% train / 20% test  (recommended for small datasets)")
-    print("  2. 70% train / 30% test  (more data for testing)")
-    print("  3. 90% train / 10% test  (maximize training data)")
+    print("  1. 80% train / 20% test")
+    print("  2. 70% train / 30% test")
+    print("  3. 90% train / 10% test")
     print("  4. Use settings.py value (no change)")
     print("  5. Custom split")
     
@@ -175,7 +175,7 @@ def get_train_test_split():
                     print(f"⚠️  Empty input. Try again. ({3 - attempts} attempts left)")
                 else:
                     print("❌ Too many invalid attempts. Returning to menu...")
-                    return cfg.TEST_SET_FRACTION
+                    return 1.0 - cfg.TRAIN_SET_FRACTION
                 continue
             
             if choice == '1':
@@ -185,40 +185,43 @@ def get_train_test_split():
             elif choice == '3':
                 return 0.1  # 90/10
             elif choice == '4':
-                return cfg.TEST_SET_FRACTION  # From settings.py
+                return 1.0 - cfg.TRAIN_SET_FRACTION  # From settings.py
             elif choice == '5':
+                print("\n📌 NOTE: When you select a training percentage, the test percentage will be automatically assigned.")
+                print("   For example: if you enter 80, it will be 80% train / 20% test")
                 sub_attempts = 0
                 while sub_attempts < 3:
                     try:
-                        test_pct = float(input("Enter test percentage (e.g., 20 for 20%): "))
-                        if 5 <= test_pct <= 50:
-                            return test_pct / 100.0
+                        train_pct = float(input("\nEnter training percentage (e.g., 80 for 80%) maximum and minimum values (10-95): "))
+                        if 10 <= train_pct <= 95:
+                            test_pct = 1.0 - (train_pct / 100.0)
+                            return test_pct
                         else:
                             sub_attempts += 1
                             if sub_attempts < 3:
-                                print(f"⚠️  Test percentage should be between 5% and 50%. ({3 - sub_attempts} attempts left)")
+                                print(f"⚠️  Training percentage should be between 10% and 95%. ({3 - sub_attempts} attempts left)")
                             else:
                                 print("❌ Too many invalid attempts. Using default...")
-                                return cfg.TEST_SET_FRACTION
+                                return 1.0 - cfg.TRAIN_SET_FRACTION
                     except ValueError:
                         sub_attempts += 1
                         if sub_attempts < 3:
-                            print(f"⚠️  Invalid input. Enter a number (e.g., 20). ({3 - sub_attempts} attempts left)")
+                            print(f"⚠️  Invalid input. Enter a number (e.g., 80). ({3 - sub_attempts} attempts left)")
                         else:
                             print("❌ Too many invalid attempts. Using default...")
-                            return cfg.TEST_SET_FRACTION
-                return cfg.TEST_SET_FRACTION
+                            return 1.0 - cfg.TRAIN_SET_FRACTION
+                return 1.0 - cfg.TRAIN_SET_FRACTION
             else:
                 attempts += 1
                 if attempts < 3:
                     print(f"⚠️  Invalid option. Choose 1-5. ({3 - attempts} attempts left)")
                 else:
                     print("❌ Too many invalid attempts. Returning to menu...")
-                    return cfg.TEST_SET_FRACTION
+                    return 1.0 - cfg.TRAIN_SET_FRACTION
         except KeyboardInterrupt:
             print("\n\n⚠️  Using default from settings.py")
-            return cfg.TEST_SET_FRACTION
-    return cfg.TEST_SET_FRACTION
+            return 1.0 - cfg.TRAIN_SET_FRACTION
+    return 1.0 - cfg.TRAIN_SET_FRACTION
 
 
 def split_data_scaffold(df, test_fraction=None):

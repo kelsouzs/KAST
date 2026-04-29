@@ -1,13 +1,23 @@
 # K-talysticFlow (KAST) Documentation
+:::{only} html
 ```{raw} html
 <div style="text-align: center; padding: 2.5rem 0 1.5rem 0;">
-  <h1 style="font-size: 2.2rem; margin: 0;">K-talysticFlow (KAST)</h1>
+  <div style="font-size: 2.2rem; font-weight: bold; margin: 0; font-family: Lato, sans-serif;">
+    K-talysticFlow (KAST)
+  </div>
   <p style="font-size: 1.1rem; color: #000000; margin-top: 0.5rem;">
     <strong>K</strong>-atalystic <strong>A</strong>utomated <strong>S</strong>creening
     <strong>T</strong>askflow — Automated Deep Learning for Molecular Bioactivity Prediction
   </p>
+  <p style="margin-top: 1rem; font-size: 0.95rem;">
+    📖 <a href="getting-started/overview.html">Overview</a> &nbsp;·&nbsp;
+    🚀 <a href="getting-started/installation.html">Installation</a> &nbsp;·&nbsp;
+    ⚡ <a href="getting-started/quick-start.html">Quick Start</a> &nbsp;·&nbsp;
+    🐙 <a href="https://github.com/kelsouzs/KAST" target="_blank">GitHub</a>
+  </p>
 </div>
 ```
+:::
 
 ***
 

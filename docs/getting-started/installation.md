@@ -63,6 +63,36 @@ python main.py
 
 ---
 
+### Uninstall KAST (Windows)
+
+To remove KAST environment and all shortcuts:
+
+1. **Download `uninstall.exe`** from the KAST releases page
+2. **Double-click `uninstall.exe`** in the KAST folder
+3. Confirm when prompted
+4. Wait for uninstall to complete (1-2 minutes)
+
+**What `uninstall.exe` does automatically:**
+```
+✅ Lists your Conda environments (verification)
+✅ Removes 'ktalysticflow' conda environment
+✅ Deletes desktop shortcut "K-talysticFlow 1.0.0"
+✅ Removes Start Menu shortcut
+✅ Deletes run_kast.bat launcher script
+```
+
+**Or uninstall manually:**
+
+```powershell
+# Activate environment (if needed)
+conda activate ktalysticflow
+
+# Remove environment
+conda env remove -n ktalysticflow -y
+```
+
+---
+
 ## 🐧 Linux Installation
 
 ### Option 1: Automated Setup (Recommended!) ⚡

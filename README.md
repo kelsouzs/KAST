@@ -20,7 +20,7 @@
 
 ## 👨‍🔬 What is K-talysticFlow?
 
-K-talysticFlow is an automated, interactive pipeline for training and using Deep Learning models to predict molecular bioactivity. Perfect for virtual screening and rapid identification of promising chemical compounds.
+K-talysticFlow (KAST) is an open-source virtual screening pipeline and computational chemistry tool designed to accelerate drug discovery. Built with Python, DeepChem, and TensorFlow, it automates the evaluation of antituberculosis agents and other molecular compounds using advanced Deep Learning models.
 
 **Version:** 1.0.0 (Stable)  
 **Developed at:** [Laboratory of Molecular Modeling (LMM-UEFS)](https://lmm.uefs.br/) — Funded by CNPq

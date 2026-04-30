@@ -6,13 +6,35 @@ Get KAST running and complete your first analysis in **5 minutes**.
 
 ## Step 1: Launch KAST
 
-**Windows:**
-- Click desktop shortcut **"K-talysticFlow 1.0.0"**
-- Or double-click `run_kast.bat`
+### **Windows:**
 
-**Linux:**
-- Search for **"K-talysticFlow"** in your app menu
-- Or run: `conda activate ktalysticflow && python main.py`
+**Option A - Desktop Shortcut (Recommended):**
+- Click the **"K-talysticFlow"** shortcut on your desktop
+
+**Option B - Command Line:**
+```bash
+conda activate ktalysticflow
+python main.py
+```
+
+### **Linux/macOS:**
+
+**Option A - Command Line (Recommended & Easiest):**
+```bash
+kast
+```
+This command works from **any terminal, any directory**.
+
+**Option B - Desktop Menu:**
+- Search for **"K-talysticFlow"** in your application menu
+- Click to launch
+
+**Option C - Manual:**
+```bash
+conda activate ktalysticflow
+cd /path/to/KAST
+python main.py
+```
 
 ---
 
@@ -20,21 +42,21 @@ Get KAST running and complete your first analysis in **5 minutes**.
 
 You'll see:
 ```
-=========================================================
-    🧬 K-talysticFlow (KAST) Control Panel v1.0.0
-=========================================================
+╔════════════════════════════════════════╗
+║  Control Panel - KAST                 ║
+╚════════════════════════════════════════╝
 
-[1] 📋 Data Preparation (Split Train/Test)
-[2] 🧬 Featurize Molecules (Generate Fingerprints)
-[3] 🤖 Train Model
-[4] 📊 Evaluate Model
-[5] 🔮 Featurize New Molecules for Prediction
-[6] 🎯 Run Predictions on New Molecules
-[7] 📊 View Results & Statistics
-[8] ⚙️  Advanced Options (Check env, test parallel, etc)
-[0] ❌ Exit
+  [1] Prepare and Split Data
+  [2] Generate Fingerprints
+  [3] Create and Train the Model
+  [4] Evaluate the Model
+  [5] Predict Activity of New Molecules
 
-Enter your choice: 
+  [8] Advanced Options (Testing & Configuration)
+  [9] About & How to Cite
+  [0] Exit Program
+
+Enter your choice number: 
 ```
 
 ---
@@ -47,57 +69,33 @@ Enter your choice:
 ```
 CC(C)Cc1ccc(cc1)C(C)C(O)=O  ibuprofen
 CN1C=NC2=C1C(=O)N(C(=O)N2C)C  caffeine
-CC(C)CC1=CC(=C(C=C1)C(C)C)O  ibuprofen
 ```
 
 `data/inactives.smi`:
 ```
 CCCCCCCCCCCCCCCC  hexadecane
 CC(=O)OC1=CC=CC=C1C(=O)O  aspirin
-CCC(C)C(O)=O  2-methylbutanoic acid
 ```
 
 **Format:** `SMILES [space] optional_name`
 
 ---
 
-## Step 4: Run the Pipeline
+## Step 4: Run the Pipeline (Sequential Steps)
 
-**In the menu, press `[1]`** to start:
+**Press `[1]`** → Prepare and split data
+**Press `[2]`** → Generate molecular fingerprints  
+**Press `[3]`** → Create and train the model  
+**Press `[4]`** → Evaluate model performance  
+**Press `[5]`** → Make predictions on new molecules
 
-```
-[1] 📋 Data Preparation
-Enter percentage for training set (default 80): 80
-Loading actives.smi... ✅ Loaded 500 active compounds
-Loading inactives.smi... ✅ Loaded 500 inactive compounds
-Creating train/test split...
-```
+---
 
-**Then press `[2]`** to featurize:
-```
-[2] 🧬 Featurize Molecules
-Processing molecules with RDKit...
-Generating Morgan fingerprints (radius=2)...
-```
+## Next Steps
 
-**Then press `[3]`** to train the model:
-```
-[3] 🤖 Train Model
-Building neural network...
-Training on 800 molecules...
-Epochs: [████████████████] 100%
-Training complete! ✅
-```
-
-**Then press `[4]`** to evaluate:
-```
-[4] 📊 Evaluate Model
-ROC-AUC Score: 0.85
-Accuracy: 0.82
-Cross-Validation F1: 0.83
-...
-Report saved to results/4_0_evaluation_report.txt
-```
+- **Check environment:** `[8]` → `[1]`
+- **View results:** Check the `results/` folder
+- **Help:** `[9]` for credits and documentation
 
 ---
 

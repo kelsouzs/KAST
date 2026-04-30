@@ -213,7 +213,12 @@ def run_script(script_name):
     """
     script_path = os.path.join(SCRIPTS_DIR, script_name)
     try:
-        subprocess.run([sys.executable, script_path], check=True, text=True)
+        # Set environment variables to suppress TensorFlow/XLA CUDA warnings on CPU-only setup
+        env = os.environ.copy()
+        env['TF_CPP_MIN_LOG_LEVEL'] = '2'
+        env['XLA_FLAGS'] = '--xla_force_host_platform_device_count=1'
+        
+        subprocess.run([sys.executable, script_path], check=True, text=True, env=env)
         return True
     except FileNotFoundError:
         print(f"\n\033[91mERROR: Script '{script_path}' not found.\033[0m")

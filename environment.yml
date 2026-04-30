@@ -42,8 +42,8 @@ dependencies:
   # Pip packages (installed after conda packages)
   # These work across all platforms
   - pip:
-    # Deep Learning Frameworks
-    - tensorflow==2.19.0
+    # Deep Learning Frameworks (CPU-only versions)
+    - tensorflow-cpu==2.19.0
     - torch==2.5.1
     - pytorch-lightning==2.5.5
     

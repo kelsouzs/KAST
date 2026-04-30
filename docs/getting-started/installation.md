@@ -1,6 +1,6 @@
 # Installation
 
-Two installation methods: **Automated** (recommended) or **Manual**.
+**Automated setup** is recommended — just run one command! Manual setup is also available if needed.
 
 ---
 
@@ -57,7 +57,7 @@ python main.py
 
 ### Option 1: Automated Setup (Recommended!) ⚡
 
-**Tested on:** Ubuntu 20.04 LTS and newer
+**Tested on:** Ubuntu 20.04 LTS, 22.04 LTS, 24.04 LTS, and other Debian-based distros
 
 1. **Make setup script executable:**
    ```bash
@@ -76,16 +76,36 @@ python main.py
 ✅ Checks if Conda is installed
 ✅ Creates 'ktalysticflow' conda environment
 ✅ Installs all Python dependencies
-✅ Creates .desktop shortcut in apps menu
+✅ Creates CLI command 'kast' (works from anywhere!)
+✅ Creates .desktop shortcut in application menu
+✅ Configures libstdc++ compatibility
+✅ Suppresses TensorFlow warnings
 ```
 
-**After setup, launch KAST:**
-- **Option A:** Search for **"K-talysticFlow"** in your app menu and click
-- **Option B:** From terminal:
-  ```bash
-  conda activate ktalysticflow
-  python main.py
-  ```
+**After setup, launch KAST any of these ways:**
+- **Easiest!** Open terminal and type: `kast`
+- Search for **"K-talysticFlow"** in your app menu and click
+- Traditional: `conda activate ktalysticflow && python main.py`
+
+---
+
+### Update Existing Installation
+
+If you already have KAST installed and want to update packages:
+
+```bash
+./setup.sh --update
+```
+
+---
+
+### Uninstall KAST
+
+To remove KAST environment and all shortcuts:
+
+```bash
+./setup.sh --uninstall
+```
 
 ---
 
@@ -98,7 +118,7 @@ If `setup.sh` doesn't work:
 cd /path/to/KAST
 
 # Create environment
-conda env create -f environment.yml -y
+conda env create -f environment.yml
 
 # Activate
 conda activate ktalysticflow

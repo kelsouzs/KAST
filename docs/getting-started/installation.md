@@ -6,6 +6,16 @@
 
 ## 🪟 Windows Installation
 
+> ⚠️ **IMPORTANT PREREQUISITES**
+>
+> Before running `setup.exe`, ensure the following:
+> 
+> 1. **Anaconda or Miniconda must be installed** — Download from [Anaconda.com](https://www.anaconda.com/download) or [Miniconda](https://docs.conda.io/projects/miniconda/en/latest/)
+> 2. **Accept all permissions in Anaconda Prompt** — During Anaconda/Miniconda installation, accept all prompts and click **"Yes"** for initializing Conda
+> 3. **Initialize Conda system-wide** — After installation, open **Anaconda Prompt** and run: `conda init` to ensure system-wide initialization
+>
+> **Tip:** If you're unsure whether Conda is properly installed, open "Anaconda Prompt" from your Start Menu. If it opens successfully, you're ready to proceed!
+
 ### Option 1: Automated Setup (Recommended!) 
 
 **Best for:** Everyone — no terminal needed!

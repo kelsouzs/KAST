@@ -23,6 +23,11 @@ ENV/
 .DS_Store
 Thumbs.db
 *.bat
+*.spec
+setup.py
+uninstall.py
+dist/
+build/
 
 # Results and outputs
 results/
